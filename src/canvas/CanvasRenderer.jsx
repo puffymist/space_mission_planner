@@ -1,9 +1,12 @@
 import { useRef, useEffect } from 'react';
 import useCameraStore from '../state/useCameraStore.js';
 import useSimStore from '../state/useSimStore.js';
+import useCraftStore from '../state/useCraftStore.js';
 import { getAllBodyPositions, getBodyPosition } from '../physics/bodyPosition.js';
 import { drawOrbits } from './drawOrbits.js';
 import { drawBodies } from './drawBodies.js';
+import { drawTrajectory } from './drawTrajectory.js';
+import { drawSpacecraft } from './drawSpacecraft.js';
 import { setupInteraction } from './interaction.js';
 
 export default function CanvasRenderer() {
@@ -24,7 +27,6 @@ export default function CanvasRenderer() {
       canvas.style.width = rect.width + 'px';
       canvas.style.height = rect.height + 'px';
       ctx.scale(dpr, dpr);
-      // Store logical size for coordinate transforms
       canvas._logicalWidth = rect.width;
       canvas._logicalHeight = rect.height;
     }
@@ -40,7 +42,7 @@ export default function CanvasRenderer() {
     let lastTime = performance.now();
 
     function frame(now) {
-      const dt = (now - lastTime) / 1000; // real seconds elapsed
+      const dt = (now - lastTime) / 1000;
       lastTime = now;
 
       const sim = useSimStore.getState();
@@ -59,10 +61,8 @@ export default function CanvasRenderer() {
         useCameraStore.setState({ centerX: targetPos.x, centerY: targetPos.y });
       }
 
-      // Get updated camera after tracking
       const cam = useCameraStore.getState();
 
-      // Use logical dimensions for drawing
       const logicalCanvas = {
         width: canvas._logicalWidth || canvas.width,
         height: canvas._logicalHeight || canvas.height,
@@ -78,9 +78,21 @@ export default function CanvasRenderer() {
       // Compute body positions
       const bodyPositions = getAllBodyPositions(epoch);
 
-      // Draw layers
+      // Draw layers (back to front)
       drawOrbits(ctx, cam, logicalCanvas, bodyPositions);
+
+      // Draw spacecraft trajectories
+      const crafts = useCraftStore.getState().crafts;
+      for (const craft of crafts) {
+        drawTrajectory(ctx, cam, logicalCanvas, craft.segments, craft.color, epoch);
+      }
+
       drawBodies(ctx, cam, logicalCanvas, bodyPositions);
+
+      // Draw spacecraft markers on top
+      for (const craft of crafts) {
+        drawSpacecraft(ctx, cam, logicalCanvas, craft, epoch);
+      }
 
       animId = requestAnimationFrame(frame);
     }

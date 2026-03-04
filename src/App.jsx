@@ -2,6 +2,7 @@ import './App.css';
 import CanvasRenderer from './canvas/CanvasRenderer.jsx';
 import TopBar from './components/TopBar.jsx';
 import EpochSlider from './components/EpochSlider.jsx';
+import SpacecraftPanel from './components/SpacecraftPanel.jsx';
 
 function App() {
   return (
@@ -9,6 +10,7 @@ function App() {
       <CanvasRenderer />
       <TopBar />
       <EpochSlider />
+      <SpacecraftPanel />
     </div>
   );
 }
