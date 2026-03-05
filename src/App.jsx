@@ -5,15 +5,21 @@ import EpochSlider from './components/EpochSlider.jsx';
 import SpacecraftPanel from './components/SpacecraftPanel.jsx';
 import DeltaVPanel from './components/DeltaVPanel.jsx';
 import TrajectoryInfo from './components/TrajectoryInfo.jsx';
+import CameraHelper from './components/CameraHelper.jsx';
+import HohmannPanel from './components/HohmannPanel.jsx';
+import ImportExport from './components/ImportExport.jsx';
 
 function App() {
   return (
     <div className="app">
       <CanvasRenderer />
       <TopBar />
+      <ImportExport />
+      <CameraHelper />
       <EpochSlider />
       <SpacecraftPanel />
       <DeltaVPanel />
+      <HohmannPanel />
       <TrajectoryInfo />
     </div>
   );

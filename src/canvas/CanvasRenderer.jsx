@@ -3,13 +3,71 @@ import useCameraStore from '../state/useCameraStore.js';
 import useSimStore from '../state/useSimStore.js';
 import useCraftStore from '../state/useCraftStore.js';
 import useUIStore from '../state/useUIStore.js';
+import { BODY_MAP } from '../constants/bodies.js';
+import { AU } from '../constants/physics.js';
 import { getAllBodyPositions, getBodyPosition } from '../physics/bodyPosition.js';
 import { drawOrbits } from './drawOrbits.js';
 import { drawBodies } from './drawBodies.js';
 import { drawTrajectory } from './drawTrajectory.js';
 import { drawSpacecraft } from './drawSpacecraft.js';
 import { drawGhosts } from './drawGhosts.js';
+import { drawTransferPreview } from './drawTransferPreview.js';
 import { setupInteraction } from './interaction.js';
+
+// Keyboard shortcut: digit -> body to track
+const DIGIT_BODIES = {
+  '1': 'mercury', '2': 'venus', '3': 'earth', '4': 'mars',
+  '5': 'jupiter', '6': 'saturn', '7': 'uranus', '8': 'neptune', '0': 'sun',
+};
+
+function drawScaleBar(ctx, cam, canvas) {
+  // Pick a nice round scale length in world units
+  const pixelTarget = 120; // target bar length in pixels
+  const worldPerPx = 1 / cam.zoom;
+  const worldTarget = pixelTarget * worldPerPx;
+
+  // Find the nearest "nice" number
+  const exp = Math.floor(Math.log10(worldTarget));
+  const base = Math.pow(10, exp);
+  let nice = base;
+  if (worldTarget / base >= 5) nice = 5 * base;
+  else if (worldTarget / base >= 2) nice = 2 * base;
+
+  const barPx = nice * cam.zoom;
+
+  // Format label
+  let label;
+  if (nice >= AU * 0.5) {
+    label = (nice / AU).toFixed(nice >= AU * 5 ? 0 : 1) + ' AU';
+  } else if (nice >= 1e9) {
+    label = (nice / 1e9).toFixed(nice >= 1e10 ? 0 : 1) + ' Gm';
+  } else if (nice >= 1e6) {
+    label = (nice / 1e6).toFixed(nice >= 1e7 ? 0 : 1) + ' Mm';
+  } else if (nice >= 1e3) {
+    label = (nice / 1e3).toFixed(nice >= 1e4 ? 0 : 1) + ' km';
+  } else {
+    label = nice.toFixed(0) + ' m';
+  }
+
+  const x = canvas.width - 20 - barPx;
+  const y = canvas.height - 50; // above the epoch slider
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x, y - 4);
+  ctx.lineTo(x, y);
+  ctx.lineTo(x + barPx, y);
+  ctx.lineTo(x + barPx, y - 4);
+  ctx.stroke();
+
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.font = '10px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(label, x + barPx / 2, y - 6);
+  ctx.restore();
+}
 
 export default function CanvasRenderer() {
   const canvasRef = useRef(null);
@@ -38,6 +96,57 @@ export default function CanvasRenderer() {
       setupInteraction(canvas);
       interactionSetup.current = true;
     }
+
+    // Keyboard shortcuts
+    function handleKeyDown(e) {
+      // Ignore if typing in an input/select
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+
+      const cam = useCameraStore.getState();
+      const sim = useSimStore.getState();
+      const panAmount = 100 / cam.zoom;
+
+      switch (e.key) {
+        case ' ':
+          e.preventDefault();
+          useSimStore.setState({ playing: !sim.playing });
+          break;
+        case '=':
+        case '+':
+          useCameraStore.setState({ zoom: cam.zoom * 1.5 });
+          break;
+        case '-':
+          useCameraStore.setState({ zoom: cam.zoom / 1.5 });
+          break;
+        case 'ArrowLeft':
+          useCameraStore.setState({ centerX: cam.centerX - panAmount, trackTarget: null });
+          break;
+        case 'ArrowRight':
+          useCameraStore.setState({ centerX: cam.centerX + panAmount, trackTarget: null });
+          break;
+        case 'ArrowUp':
+          useCameraStore.setState({ centerY: cam.centerY + panAmount, trackTarget: null });
+          break;
+        case 'ArrowDown':
+          useCameraStore.setState({ centerY: cam.centerY - panAmount, trackTarget: null });
+          break;
+        default: {
+          // Digit keys: jump to body
+          const bodyId = DIGIT_BODIES[e.key];
+          if (bodyId) {
+            const epoch = useSimStore.getState().epoch;
+            const pos = getBodyPosition(bodyId, epoch);
+            const body = BODY_MAP[bodyId];
+            let zoom;
+            if (bodyId === 'sun') zoom = 400 / (2 * AU);
+            else if (body.parent === 'sun') zoom = 400 / (body.orbitalRadius * 0.02);
+            else zoom = 400 / (3 * body.orbitalRadius);
+            useCameraStore.setState({ centerX: pos.x, centerY: pos.y, zoom, trackTarget: bodyId });
+          }
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
 
     let lastTime = performance.now();
 
@@ -84,6 +193,11 @@ export default function CanvasRenderer() {
         drawGhosts(ctx, cam, logicalCanvas, ui.hoveredEpoch, crafts);
       }
 
+      // Transfer preview ellipse
+      if (ui.transferPreview) {
+        drawTransferPreview(ctx, cam, logicalCanvas, ui.transferPreview);
+      }
+
       // Trajectories
       for (const craft of crafts) {
         drawTrajectory(ctx, cam, logicalCanvas, craft.segments, craft.color, epoch);
@@ -95,6 +209,9 @@ export default function CanvasRenderer() {
         drawSpacecraft(ctx, cam, logicalCanvas, craft, epoch);
       }
 
+      // Scale bar
+      drawScaleBar(ctx, cam, logicalCanvas);
+
       animId = requestAnimationFrame(frame);
     }
 
@@ -103,6 +220,7 @@ export default function CanvasRenderer() {
     return () => {
       cancelAnimationFrame(animId);
       window.removeEventListener('resize', resize);
+      window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
 
