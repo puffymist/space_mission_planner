@@ -10,6 +10,8 @@ const useUIStore = create((set) => ({
   // Screen position of hover (for tooltip placement)
   hoverScreenX: 0,
   hoverScreenY: 0,
+  // Transfer preview points (array of {x,y} or null)
+  transferPreview: null,
 
   setHover: (epoch, type, id, sx, sy) => set({
     hoveredEpoch: epoch,

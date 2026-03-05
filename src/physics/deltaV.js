@@ -58,10 +58,12 @@ export const DIRECTIONS = [
   { id: 'radialIn', label: 'Radial In', fn: 'radialIn', needsBody: true },
   { id: 'anticlockwise', label: 'Anticlockwise', fn: 'anticlockwise', needsBody: true },
   { id: 'clockwise', label: 'Clockwise', fn: 'clockwise', needsBody: true },
+  { id: 'custom', label: 'Custom Angle', fn: 'custom' },
 ];
 
 // Compute the delta-v vector given direction, magnitude, craft state, and optional body position
-export function computeDeltaV(directionId, magnitude, craftState, bodyPos) {
+// For custom angle: pass angleDeg (degrees counterclockwise from +X axis)
+export function computeDeltaV(directionId, magnitude, craftState, bodyPos, angleDeg) {
   let dir;
   switch (directionId) {
     case 'prograde': dir = prograde(craftState.vx, craftState.vy); break;
@@ -72,6 +74,11 @@ export function computeDeltaV(directionId, magnitude, craftState, bodyPos) {
     case 'radialIn': dir = radialIn(craftState, bodyPos); break;
     case 'anticlockwise': dir = anticlockwise(craftState, bodyPos); break;
     case 'clockwise': dir = clockwise(craftState, bodyPos); break;
+    case 'custom': {
+      const rad = (angleDeg || 0) * Math.PI / 180;
+      dir = { x: Math.cos(rad), y: Math.sin(rad) };
+      break;
+    }
     default: dir = prograde(craftState.vx, craftState.vy);
   }
   return { dvx: dir.x * magnitude, dvy: dir.y * magnitude };

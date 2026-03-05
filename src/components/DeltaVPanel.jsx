@@ -19,18 +19,21 @@ export default function DeltaVPanel() {
   const [magnitude, setMagnitude] = useState(1000); // m/s
   const [refBody, setRefBody] = useState('sun');
   const [dvStep, setDvStep] = useState(100); // m/s step for slider
+  const [customAngle, setCustomAngle] = useState(0); // degrees CCW from +X
 
   const craft = crafts.find((c) => c.id === selectedCraftId);
   if (!craft) return null;
 
-  const needsBody = DIRECTIONS.find(d => d.id === direction)?.needsBody;
+  const dirDef = DIRECTIONS.find(d => d.id === direction);
+  const needsBody = dirDef?.needsBody;
+  const isCustom = direction === 'custom';
 
   const handleAdd = () => {
     const craftState = interpolateState(craft.segments, epoch);
     if (!craftState) return;
 
     const bodyPos = needsBody ? getBodyPosition(refBody, epoch) : null;
-    const dv = computeDeltaV(direction, magnitude, craftState, bodyPos);
+    const dv = computeDeltaV(direction, magnitude, craftState, bodyPos, customAngle);
     addDeltaV(craft.id, epoch, dv.dvx, dv.dvy);
   };
 
@@ -72,6 +75,21 @@ export default function DeltaVPanel() {
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}
             </select>
+          </div>
+        )}
+
+        {isCustom && (
+          <div style={styles.row}>
+            <span style={styles.label}>Angle:</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <input
+                type="number"
+                value={customAngle}
+                onChange={(e) => setCustomAngle(Number(e.target.value))}
+                style={styles.angleInput}
+              />
+              <span style={{ fontSize: 10, color: '#888' }}>deg CCW</span>
+            </div>
           </div>
         )}
 
@@ -253,5 +271,15 @@ const styles = {
     padding: '0 5px',
     fontSize: 9,
     cursor: 'pointer',
+  },
+  angleInput: {
+    width: 60,
+    background: 'rgba(255,255,255,0.1)',
+    border: '1px solid rgba(255,255,255,0.2)',
+    color: '#fff',
+    borderRadius: 3,
+    padding: '2px 4px',
+    fontSize: 11,
+    textAlign: 'right',
   },
 };
