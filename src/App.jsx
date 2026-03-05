@@ -4,6 +4,7 @@ import TopBar from './components/TopBar.jsx';
 import EpochSlider from './components/EpochSlider.jsx';
 import SpacecraftPanel from './components/SpacecraftPanel.jsx';
 import DeltaVPanel from './components/DeltaVPanel.jsx';
+import TrajectoryInfo from './components/TrajectoryInfo.jsx';
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
       <EpochSlider />
       <SpacecraftPanel />
       <DeltaVPanel />
+      <TrajectoryInfo />
     </div>
   );
 }

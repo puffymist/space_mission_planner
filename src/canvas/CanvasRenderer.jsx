@@ -2,11 +2,13 @@ import { useRef, useEffect } from 'react';
 import useCameraStore from '../state/useCameraStore.js';
 import useSimStore from '../state/useSimStore.js';
 import useCraftStore from '../state/useCraftStore.js';
+import useUIStore from '../state/useUIStore.js';
 import { getAllBodyPositions, getBodyPosition } from '../physics/bodyPosition.js';
 import { drawOrbits } from './drawOrbits.js';
 import { drawBodies } from './drawBodies.js';
 import { drawTrajectory } from './drawTrajectory.js';
 import { drawSpacecraft } from './drawSpacecraft.js';
+import { drawGhosts } from './drawGhosts.js';
 import { setupInteraction } from './interaction.js';
 
 export default function CanvasRenderer() {
@@ -18,7 +20,6 @@ export default function CanvasRenderer() {
     const ctx = canvas.getContext('2d');
     let animId;
 
-    // Resize canvas to fill parent
     function resize() {
       const dpr = window.devicePixelRatio || 1;
       const rect = canvas.parentElement.getBoundingClientRect();
@@ -33,9 +34,8 @@ export default function CanvasRenderer() {
     resize();
     window.addEventListener('resize', resize);
 
-    // Set up mouse interaction (once)
     if (!interactionSetup.current) {
-      setupInteraction(canvas, useCameraStore, useSimStore);
+      setupInteraction(canvas);
       interactionSetup.current = true;
     }
 
@@ -48,14 +48,12 @@ export default function CanvasRenderer() {
       const sim = useSimStore.getState();
       const camera = useCameraStore.getState();
 
-      // Advance epoch if playing
       if (sim.playing) {
         useSimStore.setState({ epoch: sim.epoch + sim.speed * dt });
       }
 
       const epoch = useSimStore.getState().epoch;
 
-      // Track target body
       if (camera.trackTarget) {
         const targetPos = getBodyPosition(camera.trackTarget, epoch);
         useCameraStore.setState({ centerX: targetPos.x, centerY: targetPos.y });
@@ -68,28 +66,31 @@ export default function CanvasRenderer() {
         height: canvas._logicalHeight || canvas.height,
       };
 
-      // Clear
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       const dpr = window.devicePixelRatio || 1;
       ctx.scale(dpr, dpr);
       ctx.fillStyle = '#0a0a1a';
       ctx.fillRect(0, 0, logicalCanvas.width, logicalCanvas.height);
 
-      // Compute body positions
       const bodyPositions = getAllBodyPositions(epoch);
 
       // Draw layers (back to front)
       drawOrbits(ctx, cam, logicalCanvas, bodyPositions);
 
-      // Draw spacecraft trajectories
+      // Ghost positions (drawn behind everything else)
+      const ui = useUIStore.getState();
       const crafts = useCraftStore.getState().crafts;
+      if (ui.hoveredEpoch !== null) {
+        drawGhosts(ctx, cam, logicalCanvas, ui.hoveredEpoch, crafts);
+      }
+
+      // Trajectories
       for (const craft of crafts) {
         drawTrajectory(ctx, cam, logicalCanvas, craft.segments, craft.color, epoch);
       }
 
       drawBodies(ctx, cam, logicalCanvas, bodyPositions);
 
-      // Draw spacecraft markers on top
       for (const craft of crafts) {
         drawSpacecraft(ctx, cam, logicalCanvas, craft, epoch);
       }
