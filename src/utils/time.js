@@ -12,6 +12,12 @@ export function formatEpochShort(t) {
   return date.toISOString().slice(0, 10);
 }
 
+// Format seconds-since-J2000 as YYYY-MM-DD HH:mm:ss (no timezone, compact)
+export function formatEpochMedium(t) {
+  const date = new Date(J2000_MS + t * 1000);
+  return date.toISOString().replace('T', ' ').slice(0, 19);
+}
+
 // Format a duration in seconds as a human-readable string
 export function formatDuration(seconds) {
   const abs = Math.abs(seconds);

@@ -1,4 +1,7 @@
-import { normalize, sub, rotate } from '../utils/vector.js';
+import { normalize, sub, rotate, cross2d, mag } from '../utils/vector.js';
+import { G } from '../constants/physics.js';
+import { BODY_MAP } from '../constants/bodies.js';
+import { getBodyPosition, getBodyVelocity } from './bodyPosition.js';
 
 // Direction helper: returns a unit vector for the delta-v direction
 
@@ -82,4 +85,41 @@ export function computeDeltaV(directionId, magnitude, craftState, bodyPos, angle
     default: dir = prograde(craftState.vx, craftState.vy);
   }
   return { dvx: dir.x * magnitude, dvy: dir.y * magnitude };
+}
+
+// Compute delta-v to circularize orbit around a body at the current distance
+// Returns {dvx, dvy} in heliocentric frame
+export function circularizeDeltaV(craftState, bodyId, epoch) {
+  const body = BODY_MAP[bodyId];
+  if (!body) return { dvx: 0, dvy: 0 };
+
+  const bodyPos = getBodyPosition(bodyId, epoch);
+  const bodyVel = getBodyVelocity(bodyId, epoch);
+
+  // Relative position and velocity
+  const relPos = sub(craftState, bodyPos);
+  const relVel = { x: craftState.vx - bodyVel.x, y: craftState.vy - bodyVel.y };
+
+  const r = mag(relPos);
+  if (r < 1) return { dvx: 0, dvy: 0 };
+
+  // Circular orbit speed at this distance
+  const vCirc = Math.sqrt(G * body.mass / r);
+
+  // Determine orbit sense from cross product of position and velocity
+  const sense = cross2d(relPos, relVel); // positive = CCW
+  const sign = sense >= 0 ? 1 : -1;
+
+  // Tangential direction (perpendicular to radial, matching orbit sense)
+  const radDir = normalize(relPos);
+  const tanDir = { x: -radDir.y * sign, y: radDir.x * sign };
+
+  // Target velocity in heliocentric frame
+  const targetVx = bodyVel.x + tanDir.x * vCirc;
+  const targetVy = bodyVel.y + tanDir.y * vCirc;
+
+  return {
+    dvx: targetVx - craftState.vx,
+    dvy: targetVy - craftState.vy,
+  };
 }

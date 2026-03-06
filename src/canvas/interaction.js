@@ -41,6 +41,7 @@ export function setupInteraction(canvas) {
         centerX: state.centerX - dx,
         centerY: state.centerY + dy,
         trackTarget: null,
+        trackType: null,
       });
       lastMouseX = e.offsetX;
       lastMouseY = e.offsetY;
@@ -147,7 +148,7 @@ export function setupInteraction(canvas) {
 
   canvas.addEventListener('mouseup', () => {
     dragging = false;
-    canvas.style.cursor = 'default';
+    canvas.style.cursor = useUIStore.getState().placementMode ? 'crosshair' : 'default';
   });
 
   canvas.addEventListener('mouseleave', () => {
@@ -158,17 +159,34 @@ export function setupInteraction(canvas) {
 
   canvas.addEventListener('click', (e) => {
     if (dragging) return;
-    const state = useCameraStore.getState();
+
+    const uiState = useUIStore.getState();
+    const cam = useCameraStore.getState();
     const lc = logicalCanvas();
-    const worldPos = screenToWorld(e.offsetX, e.offsetY, state, lc);
+    const worldPos = screenToWorld(e.offsetX, e.offsetY, cam, lc);
     const epoch = useSimStore.getState().epoch;
+
+    // Placement mode: place spacecraft at click position
+    if (uiState.placementMode) {
+      useCraftStore.getState().placeAtPosition(worldPos.x, worldPos.y, epoch);
+      useUIStore.setState({ placementMode: false });
+      canvas.style.cursor = 'default';
+      return;
+    }
+
+    // If hovering over a trajectory/orbit point, click sets epoch to that time
+    if (uiState.hoveredEpoch !== null) {
+      useSimStore.getState().setEpoch(uiState.hoveredEpoch);
+      return;
+    }
+
     const positions = getAllBodyPositions(epoch);
 
     let closestId = null;
     let closestDist = Infinity;
     for (const [id, pos] of Object.entries(positions)) {
       const d = dist(worldPos, pos);
-      const screenDist = d * state.zoom;
+      const screenDist = d * cam.zoom;
       if (screenDist < 20 && screenDist < closestDist) {
         closestDist = screenDist;
         closestId = id;
@@ -176,11 +194,11 @@ export function setupInteraction(canvas) {
     }
 
     if (closestId) {
-      useCameraStore.setState({ trackTarget: closestId });
+      useCameraStore.setState({ trackTarget: closestId, trackType: 'body' });
     }
   });
 
   canvas.addEventListener('dblclick', () => {
-    useCameraStore.setState({ trackTarget: null });
+    useCameraStore.setState({ trackTarget: null, trackType: null });
   });
 }

@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import useCameraStore from '../state/useCameraStore.js';
 import useSimStore from '../state/useSimStore.js';
+import useCraftStore from '../state/useCraftStore.js';
 import BODIES, { BODY_MAP } from '../constants/bodies.js';
 import { AU } from '../constants/physics.js';
 import { getBodyPosition } from '../physics/bodyPosition.js';
+import { interpolateState } from '../utils/interpolate.js';
 
 // Sensible zoom levels for each body type
 // The zoom is set so that the body's interesting region fills the screen
@@ -39,18 +41,35 @@ const PRESETS = [
 ];
 
 export default function CameraHelper() {
-  const [target, setTarget] = useState('earth');
+  const [target, setTarget] = useState('body:earth');
   const epoch = useSimStore((s) => s.epoch);
+  const crafts = useCraftStore((s) => s.crafts);
 
-  const goTo = (bodyId) => {
-    const pos = getBodyPosition(bodyId, epoch);
-    const zoom = getZoomForBody(bodyId);
-    useCameraStore.setState({
-      centerX: pos.x,
-      centerY: pos.y,
-      zoom,
-      trackTarget: bodyId,
-    });
+  const goTo = () => {
+    const [type, id] = target.split(':');
+    if (type === 'body') {
+      const pos = getBodyPosition(id, epoch);
+      const zoom = getZoomForBody(id);
+      useCameraStore.setState({
+        centerX: pos.x,
+        centerY: pos.y,
+        zoom,
+        trackTarget: id,
+        trackType: 'body',
+      });
+    } else if (type === 'craft') {
+      const craft = crafts.find(c => String(c.id) === id);
+      if (!craft) return;
+      const state = interpolateState(craft.segments, epoch);
+      if (!state) return;
+      useCameraStore.setState({
+        centerX: state.x,
+        centerY: state.y,
+        zoom: useCameraStore.getState().zoom,
+        trackTarget: craft.id,
+        trackType: 'craft',
+      });
+    }
   };
 
   const goToPreset = (preset) => {
@@ -59,6 +78,7 @@ export default function CameraHelper() {
       centerY: 0,
       zoom: preset.zoom,
       trackTarget: null,
+      trackType: null,
     });
   };
 
@@ -71,11 +91,20 @@ export default function CameraHelper() {
           onChange={(e) => setTarget(e.target.value)}
           style={styles.select}
         >
-          {BODIES.map((b) => (
-            <option key={b.id} value={b.id}>{b.name}</option>
-          ))}
+          <optgroup label="Bodies">
+            {BODIES.map((b) => (
+              <option key={b.id} value={`body:${b.id}`}>{b.name}</option>
+            ))}
+          </optgroup>
+          {crafts.length > 0 && (
+            <optgroup label="Spacecraft">
+              {crafts.map((c) => (
+                <option key={c.id} value={`craft:${c.id}`}>{c.name}</option>
+              ))}
+            </optgroup>
+          )}
         </select>
-        <button onClick={() => goTo(target)} style={styles.goBtn}>
+        <button onClick={goTo} style={styles.goBtn}>
           Go To
         </button>
       </div>

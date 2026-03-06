@@ -7,8 +7,10 @@ const useCameraStore = create((set) => ({
   centerY: 0,
   // Pixels per meter -- start showing ~3 AU radius
   zoom: 1 / (3 * AU / 400),
-  // Body to track (camera follows it), or null
+  // Target to track (camera follows it), or null
   trackTarget: null,
+  // Type of tracking: 'body' or 'craft'
+  trackType: null,
 
   setCenter: (x, y) => set({ centerX: x, centerY: y }),
   setZoom: (zoom) => set({ zoom }),

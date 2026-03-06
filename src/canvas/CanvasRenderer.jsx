@@ -13,6 +13,8 @@ import { drawSpacecraft } from './drawSpacecraft.js';
 import { drawGhosts } from './drawGhosts.js';
 import { drawTransferPreview } from './drawTransferPreview.js';
 import { setupInteraction } from './interaction.js';
+import { interpolateState } from '../utils/interpolate.js';
+import { worldToScreen } from './camera.js';
 
 // Keyboard shortcut: digit -> body to track
 const DIGIT_BODIES = {
@@ -119,16 +121,20 @@ export default function CanvasRenderer() {
           useCameraStore.setState({ zoom: cam.zoom / 1.5 });
           break;
         case 'ArrowLeft':
-          useCameraStore.setState({ centerX: cam.centerX - panAmount, trackTarget: null });
+          useCameraStore.setState({ centerX: cam.centerX - panAmount, trackTarget: null, trackType: null });
           break;
         case 'ArrowRight':
-          useCameraStore.setState({ centerX: cam.centerX + panAmount, trackTarget: null });
+          useCameraStore.setState({ centerX: cam.centerX + panAmount, trackTarget: null, trackType: null });
           break;
         case 'ArrowUp':
-          useCameraStore.setState({ centerY: cam.centerY + panAmount, trackTarget: null });
+          useCameraStore.setState({ centerY: cam.centerY + panAmount, trackTarget: null, trackType: null });
           break;
         case 'ArrowDown':
-          useCameraStore.setState({ centerY: cam.centerY - panAmount, trackTarget: null });
+          useCameraStore.setState({ centerY: cam.centerY - panAmount, trackTarget: null, trackType: null });
+          break;
+        case 'p':
+        case 'P':
+          useUIStore.setState((s) => ({ placementMode: !s.placementMode }));
           break;
         default: {
           // Digit keys: jump to body
@@ -141,7 +147,7 @@ export default function CanvasRenderer() {
             if (bodyId === 'sun') zoom = 400 / (2 * AU);
             else if (body.parent === 'sun') zoom = 400 / (body.orbitalRadius * 0.02);
             else zoom = 400 / (3 * body.orbitalRadius);
-            useCameraStore.setState({ centerX: pos.x, centerY: pos.y, zoom, trackTarget: bodyId });
+            useCameraStore.setState({ centerX: pos.x, centerY: pos.y, zoom, trackTarget: bodyId, trackType: 'body' });
           }
         }
       }
@@ -164,8 +170,17 @@ export default function CanvasRenderer() {
       const epoch = useSimStore.getState().epoch;
 
       if (camera.trackTarget) {
-        const targetPos = getBodyPosition(camera.trackTarget, epoch);
-        useCameraStore.setState({ centerX: targetPos.x, centerY: targetPos.y });
+        let targetPos = null;
+        if (camera.trackType === 'craft') {
+          const craft = useCraftStore.getState().crafts.find(c => c.id === camera.trackTarget);
+          if (craft) targetPos = interpolateState(craft.segments, epoch);
+        }
+        if (!targetPos) {
+          targetPos = getBodyPosition(camera.trackTarget, epoch);
+        }
+        if (targetPos) {
+          useCameraStore.setState({ centerX: targetPos.x, centerY: targetPos.y });
+        }
       }
 
       const cam = useCameraStore.getState();
@@ -183,8 +198,10 @@ export default function CanvasRenderer() {
 
       const bodyPositions = getAllBodyPositions(epoch);
 
+      const epochStep = useSimStore.getState().epochStep;
+
       // Draw layers (back to front)
-      drawOrbits(ctx, cam, logicalCanvas, bodyPositions);
+      drawOrbits(ctx, cam, logicalCanvas, bodyPositions, epochStep);
 
       // Ghost positions (drawn behind everything else)
       const ui = useUIStore.getState();
@@ -198,9 +215,35 @@ export default function CanvasRenderer() {
         drawTransferPreview(ctx, cam, logicalCanvas, ui.transferPreview);
       }
 
+      // Live maneuver preview (dashed, semi-transparent)
+      if (ui.maneuverPreview && ui.maneuverPreview.segments) {
+        ctx.save();
+        ctx.strokeStyle = ui.maneuverPreview.color;
+        ctx.lineWidth = 1.5;
+        ctx.globalAlpha = 0.4;
+        ctx.setLineDash([6, 4]);
+        for (const seg of ui.maneuverPreview.segments) {
+          if (seg.length < 2) continue;
+          ctx.beginPath();
+          let started = false;
+          for (const pt of seg) {
+            const scr = worldToScreen(pt.x, pt.y, cam, logicalCanvas);
+            if (scr.x < -500 || scr.x > logicalCanvas.width + 500 ||
+                scr.y < -500 || scr.y > logicalCanvas.height + 500) {
+              if (started) { ctx.stroke(); ctx.beginPath(); started = false; }
+              continue;
+            }
+            if (!started) { ctx.moveTo(scr.x, scr.y); started = true; }
+            else ctx.lineTo(scr.x, scr.y);
+          }
+          if (started) ctx.stroke();
+        }
+        ctx.restore();
+      }
+
       // Trajectories
       for (const craft of crafts) {
-        drawTrajectory(ctx, cam, logicalCanvas, craft.segments, craft.color, epoch);
+        drawTrajectory(ctx, cam, logicalCanvas, craft.segments, craft.color, epoch, epochStep);
       }
 
       drawBodies(ctx, cam, logicalCanvas, bodyPositions);

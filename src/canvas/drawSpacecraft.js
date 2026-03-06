@@ -1,5 +1,6 @@
 import { worldToScreen } from './camera.js';
 import { interpolateState } from '../utils/interpolate.js';
+import { formatVelocity } from '../utils/time.js';
 
 // Draw a spacecraft at its current position
 export function drawSpacecraft(ctx, camera, canvas, craft, epoch) {
@@ -34,7 +35,7 @@ export function drawSpacecraft(ctx, camera, canvas, craft, epoch) {
   ctx.textAlign = 'center';
   ctx.fillText(craft.name, screen.x, screen.y - 10);
 
-  // Draw maneuver nodes
+  // Draw maneuver nodes with impulse vectors
   for (const ev of craft.events) {
     const evState = interpolateState(craft.segments, ev.epoch);
     if (!evState) continue;
@@ -50,5 +51,41 @@ export function drawSpacecraft(ctx, camera, canvas, craft, epoch) {
     ctx.moveTo(evScreen.x + m, evScreen.y - m);
     ctx.lineTo(evScreen.x - m, evScreen.y + m);
     ctx.stroke();
+
+    // Impulse vector arrow
+    const dvMag = Math.sqrt(ev.dvx * ev.dvx + ev.dvy * ev.dvy);
+    if (dvMag > 0) {
+      // Arrow length: log-scaled, clamped
+      const arrowLen = Math.min(60, Math.max(15, 10 * Math.log10(dvMag + 1)));
+      // Direction in screen coords (Y flipped)
+      const dirX = ev.dvx / dvMag;
+      const dirY = -ev.dvy / dvMag;
+      const endX = evScreen.x + dirX * arrowLen;
+      const endY = evScreen.y + dirY * arrowLen;
+
+      // Arrow shaft
+      ctx.strokeStyle = '#ff0';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(evScreen.x, evScreen.y);
+      ctx.lineTo(endX, endY);
+      ctx.stroke();
+
+      // Arrowhead
+      const headLen = 5;
+      const angle = Math.atan2(dirY, dirX);
+      ctx.beginPath();
+      ctx.moveTo(endX, endY);
+      ctx.lineTo(endX - headLen * Math.cos(angle - 0.4), endY - headLen * Math.sin(angle - 0.4));
+      ctx.moveTo(endX, endY);
+      ctx.lineTo(endX - headLen * Math.cos(angle + 0.4), endY - headLen * Math.sin(angle + 0.4));
+      ctx.stroke();
+
+      // Delta-v label
+      ctx.fillStyle = '#ff0';
+      ctx.font = '9px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(formatVelocity(dvMag), endX, endY - 6);
+    }
   }
 }

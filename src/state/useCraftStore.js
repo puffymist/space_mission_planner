@@ -1,48 +1,64 @@
 import { create } from 'zustand';
-import { getBodyPosition, getBodyVelocity } from '../physics/bodyPosition.js';
+import { getBodyPosition, getBodyVelocity, getAllBodyPositions } from '../physics/bodyPosition.js';
 import { BODY_MAP } from '../constants/bodies.js';
 import { computeTrajectory } from '../physics/trajectory.js';
+import { sub, normalize, scale, add } from '../utils/vector.js';
+import { nearestBody } from '../physics/gravity.js';
 
 let nextId = 1;
 
 const CRAFT_COLORS = ['#00ff88', '#ff6644', '#44aaff', '#ffaa00', '#ff44ff', '#44ffff'];
+const G = 6.6743e-11;
+
+// Compute default orbit altitude for a body (in meters)
+function defaultAltitude(body) {
+  if (body.id === 'sun') return 1e10; // ~0.07 AU
+  if (body.parent === 'sun') {
+    // Planet: scale with body mass (~cube-root), floor at 10,000 km
+    // Earth ≈ 1.8e7 m (18,000 km), Jupiter ≈ 1.2e8 m (124,000 km)
+    return Math.max(Math.pow(body.mass, 1 / 3) * 0.1, 1e7);
+  }
+  // Moon: fraction of moon's orbital radius from parent
+  return body.orbitalRadius * 0.05;
+}
 
 const useCraftStore = create((set, get) => ({
   crafts: [],
   selectedCraftId: null,
 
   // Launch a spacecraft from orbit around a body at the given epoch
-  launchFromBody: (bodyId, epoch) => {
+  // altitudeM: optional altitude in meters; uses defaultAltitude if omitted
+  launchFromBody: (bodyId, epoch, altitudeM) => {
     const body = BODY_MAP[bodyId];
     if (!body) return;
 
-    // Place spacecraft slightly ahead in orbit around the body
+    const orbitAltitude = altitudeM > 0 ? altitudeM : defaultAltitude(body);
     const bodyPos = getBodyPosition(bodyId, epoch);
     const bodyVel = getBodyVelocity(bodyId, epoch);
 
-    // Offset: place at a small orbital altitude above the body
-    // For planets: offset by a fraction of their orbital radius from the Sun
-    // For the Sun: offset by Mercury's orbit radius / 10
-    let orbitAltitude;
-    if (bodyId === 'sun') {
-      orbitAltitude = 1e10; // ~0.07 AU
-    } else if (body.parent === 'sun') {
-      // Planet: orbit at roughly the body's Hill sphere or a fixed small offset
-      orbitAltitude = body.orbitalRadius * 0.005;
+    let craftPos, craftVel;
+
+    if (body.parent) {
+      // Radial direction from parent to body
+      const parentPos = getBodyPosition(body.parent, epoch);
+      const radDir = normalize(sub(bodyPos, parentPos));
+
+      // Place craft outward from parent along radial direction
+      craftPos = add(bodyPos, scale(radDir, orbitAltitude));
+
+      // Tangent perpendicular to radDir, same rotation sense as body's orbit
+      const sign = body.angularVelocity >= 0 ? 1 : -1;
+      const tanDir = { x: -radDir.y * sign, y: radDir.x * sign };
+
+      // Circular orbit speed around this body
+      const orbitalSpeed = Math.sqrt(G * body.mass / orbitAltitude);
+      craftVel = add(bodyVel, scale(tanDir, orbitalSpeed));
     } else {
-      // Moon: orbit at a fraction of the moon's orbital radius from parent
-      orbitAltitude = body.orbitalRadius * 0.1;
+      // Sun: no parent, place on +X with +Y velocity
+      craftPos = { x: bodyPos.x + orbitAltitude, y: bodyPos.y };
+      const orbitalSpeed = Math.sqrt(G * body.mass / orbitAltitude);
+      craftVel = { x: bodyVel.x, y: bodyVel.y + orbitalSpeed };
     }
-
-    // Place craft on the +x side (in body-relative frame) with circular orbit velocity
-    const craftPos = { x: bodyPos.x + orbitAltitude, y: bodyPos.y };
-
-    // Circular orbit speed around this body
-    const G = 6.6743e-11;
-    const orbitalSpeed = Math.sqrt(G * body.mass / orbitAltitude);
-
-    // Velocity: body velocity + orbital velocity (counterclockwise = +y direction for +x offset)
-    const craftVel = { x: bodyVel.x, y: bodyVel.y + orbitalSpeed };
 
     const id = nextId++;
     const craft = {
@@ -51,12 +67,39 @@ const useCraftStore = create((set, get) => ({
       color: CRAFT_COLORS[(id - 1) % CRAFT_COLORS.length],
       originBodyId: bodyId,
       launchEpoch: epoch,
+      orbitAltitude,
       initialState: { x: craftPos.x, y: craftPos.y, vx: craftVel.x, vy: craftVel.y },
-      events: [], // delta-v events
-      segments: null, // computed trajectory segments
+      events: [],
+      segments: null,
     };
 
-    // Compute trajectory
+    craft.segments = computeTrajectory(craft);
+
+    set((state) => ({
+      crafts: [...state.crafts, craft],
+      selectedCraftId: id,
+    }));
+  },
+
+  // Place spacecraft at an arbitrary world position, co-moving with nearest body
+  placeAtPosition: (x, y, epoch) => {
+    const positions = getAllBodyPositions(epoch);
+    const { bodyId } = nearestBody({ x, y }, positions);
+    const bodyVel = getBodyVelocity(bodyId, epoch);
+
+    const id = nextId++;
+    const craft = {
+      id,
+      name: `Craft ${id}`,
+      color: CRAFT_COLORS[(id - 1) % CRAFT_COLORS.length],
+      originBodyId: bodyId,
+      launchEpoch: epoch,
+      orbitAltitude: null,
+      initialState: { x, y, vx: bodyVel.x, vy: bodyVel.y },
+      events: [],
+      segments: null,
+    };
+
     craft.segments = computeTrajectory(craft);
 
     set((state) => ({

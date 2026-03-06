@@ -12,6 +12,10 @@ const useUIStore = create((set) => ({
   hoverScreenY: 0,
   // Transfer preview points (array of {x,y} or null)
   transferPreview: null,
+  // Placement mode: click canvas to place a spacecraft
+  placementMode: false,
+  // Live maneuver preview: {segments, color} or null
+  maneuverPreview: null,
 
   setHover: (epoch, type, id, sx, sy) => set({
     hoveredEpoch: epoch,

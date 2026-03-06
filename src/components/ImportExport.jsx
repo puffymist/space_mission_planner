@@ -47,6 +47,7 @@ export default function ImportExport() {
             color: c.color || '#44aaff',
             originBodyId: c.originBodyId || 'earth',
             launchEpoch: c.launchEpoch,
+            orbitAltitude: c.orbitAltitude || null,
             initialState: c.initialState,
             events: c.events || [],
             segments: null,

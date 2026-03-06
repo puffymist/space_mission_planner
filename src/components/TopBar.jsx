@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import useSimStore from '../state/useSimStore.js';
 import { formatEpoch } from '../utils/time.js';
+import { dateToJ2000 } from '../constants/physics.js';
 
 const SPEED_PRESETS = [
   { label: '-1yr/s', value: -365.25 * 86400 },
@@ -14,12 +16,34 @@ const SPEED_PRESETS = [
   { label: '1yr/s', value: 365.25 * 86400 },
 ];
 
+// Parse a date/time string to J2000 seconds
+// Accepts: "YYYY-MM-DD", "YYYY-MM-DD HH:mm", "YYYY-MM-DD HH:mm:ss"
+function parseEpochInput(str) {
+  const s = str.trim();
+  if (!s) return null;
+  let iso = s;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) iso += 'T00:00:00Z';
+  else if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(iso)) iso = iso.replace(' ', 'T') + ':00Z';
+  else if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(iso)) iso = iso.replace(' ', 'T') + 'Z';
+  else iso = iso.replace(' ', 'T');
+  const ms = Date.parse(iso);
+  if (isNaN(ms)) return null;
+  return dateToJ2000(ms);
+}
+
 export default function TopBar() {
   const epoch = useSimStore((s) => s.epoch);
   const playing = useSimStore((s) => s.playing);
   const speed = useSimStore((s) => s.speed);
   const togglePlay = useSimStore((s) => s.togglePlay);
   const setSpeed = useSimStore((s) => s.setSpeed);
+  const setEpoch = useSimStore((s) => s.setEpoch);
+  const [epochInput, setEpochInput] = useState('');
+
+  const handleEpochSubmit = () => {
+    const t = parseEpochInput(epochInput);
+    if (t !== null) setEpoch(t);
+  };
 
   return (
     <div style={styles.bar}>
@@ -37,6 +61,15 @@ export default function TopBar() {
           <option key={p.value} value={p.value}>{p.label}</option>
         ))}
       </select>
+      <input
+        type="text"
+        value={epochInput}
+        onChange={(e) => setEpochInput(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') handleEpochSubmit(); }}
+        placeholder="YYYY-MM-DD HH:mm:ss"
+        style={styles.epochInput}
+      />
+      <button onClick={handleEpochSubmit} style={styles.setBtn}>Set</button>
     </div>
   );
 }
@@ -85,5 +118,24 @@ const styles = {
     borderRadius: 4,
     padding: '2px 6px',
     fontSize: 12,
+  },
+  epochInput: {
+    background: 'rgba(255,255,255,0.1)',
+    border: '1px solid rgba(255,255,255,0.2)',
+    color: '#fff',
+    borderRadius: 4,
+    padding: '2px 6px',
+    fontSize: 11,
+    fontFamily: 'monospace',
+    width: 160,
+  },
+  setBtn: {
+    background: 'rgba(100,150,255,0.2)',
+    border: '1px solid rgba(100,150,255,0.4)',
+    color: '#8af',
+    borderRadius: 4,
+    padding: '2px 8px',
+    fontSize: 11,
+    cursor: 'pointer',
   },
 };

@@ -1,5 +1,6 @@
 import useCraftStore from '../state/useCraftStore.js';
 import useSimStore from '../state/useSimStore.js';
+import useUIStore from '../state/useUIStore.js';
 import BODIES from '../constants/bodies.js';
 import { useState } from 'react';
 
@@ -10,7 +11,14 @@ export default function SpacecraftPanel() {
   const selectCraft = useCraftStore((s) => s.selectCraft);
   const removeCraft = useCraftStore((s) => s.removeCraft);
   const epoch = useSimStore((s) => s.epoch);
+  const placementMode = useUIStore((s) => s.placementMode);
   const [launchBody, setLaunchBody] = useState('earth');
+  const [altitudeKm, setAltitudeKm] = useState('');
+
+  const handleLaunch = () => {
+    const altM = altitudeKm ? Number(altitudeKm) * 1000 : 0; // 0 = use default
+    launchFromBody(launchBody, epoch, altM);
+  };
 
   return (
     <div style={styles.panel}>
@@ -26,11 +34,26 @@ export default function SpacecraftPanel() {
             <option key={b.id} value={b.id}>{b.name}</option>
           ))}
         </select>
-        <button
-          onClick={() => launchFromBody(launchBody, epoch)}
-          style={styles.launchBtn}
-        >
+        <button onClick={handleLaunch} style={styles.launchBtn}>
           Launch
+        </button>
+      </div>
+
+      <div style={styles.altRow}>
+        <span style={styles.altLabel}>Alt (km):</span>
+        <input
+          type="number"
+          value={altitudeKm}
+          onChange={(e) => setAltitudeKm(e.target.value)}
+          placeholder="auto"
+          style={styles.altInput}
+        />
+        <button
+          onClick={() => useUIStore.setState({ placementMode: !placementMode })}
+          style={placementMode ? { ...styles.placeBtn, ...styles.placeBtnActive } : styles.placeBtn}
+          title="Click on canvas to place spacecraft"
+        >
+          Place
         </button>
       </div>
 
@@ -104,6 +127,40 @@ const styles = {
     borderRadius: 3,
     padding: '2px 8px',
     fontSize: 11,
+  },
+  altRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 8,
+  },
+  altLabel: {
+    fontSize: 10,
+    color: '#888',
+  },
+  altInput: {
+    flex: 1,
+    background: 'rgba(255,255,255,0.1)',
+    border: '1px solid rgba(255,255,255,0.2)',
+    color: '#fff',
+    borderRadius: 3,
+    padding: '2px 4px',
+    fontSize: 11,
+    textAlign: 'right',
+  },
+  placeBtn: {
+    background: 'rgba(255,255,255,0.06)',
+    border: '1px solid rgba(255,255,255,0.15)',
+    color: '#aaa',
+    borderRadius: 3,
+    padding: '2px 6px',
+    fontSize: 10,
+    cursor: 'pointer',
+  },
+  placeBtnActive: {
+    background: 'rgba(0,200,100,0.2)',
+    borderColor: 'rgba(0,200,100,0.5)',
+    color: '#0f8',
   },
   list: {
     display: 'flex',
