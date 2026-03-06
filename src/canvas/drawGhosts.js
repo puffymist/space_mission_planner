@@ -47,9 +47,17 @@ export function drawGhosts(ctx, camera, canvas, ghostEpoch, crafts) {
 
   // Draw ghost spacecraft
   for (const craft of crafts) {
-    if (!craft.segments) continue;
-    const state = interpolateState(craft.segments, ghostEpoch);
+    if (!craft.segments || craft.segments.length === 0) continue;
+    const firstSeg = craft.segments[0];
+    const lastSeg = craft.segments[craft.segments.length - 1];
+    if (!firstSeg.length || !lastSeg.length) continue;
+    const tMin = firstSeg[0].t;
+    const tMax = lastSeg[lastSeg.length - 1].t;
+    const clamped = ghostEpoch < tMin || ghostEpoch > tMax;
+    const clampedEpoch = Math.max(tMin, Math.min(tMax, ghostEpoch));
+    const state = interpolateState(craft.segments, clampedEpoch);
     if (!state) continue;
+    if (clamped) ctx.globalAlpha = 0.2; // dimmer when at trajectory boundary
 
     const screen = worldToScreen(state.x, state.y, camera, canvas);
     if (screen.x < -50 || screen.x > canvas.width + 50) continue;
@@ -67,6 +75,7 @@ export function drawGhosts(ctx, camera, canvas, ghostEpoch, crafts) {
     ctx.setLineDash([2, 2]);
     ctx.stroke();
     ctx.setLineDash([]);
+    if (clamped) ctx.globalAlpha = 0.4; // restore normal ghost alpha
   }
 
   ctx.globalAlpha = 1.0;

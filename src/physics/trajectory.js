@@ -1,7 +1,7 @@
 import { integrateSegment } from './integrator.js';
 
-// Default trajectory duration: 2 years
-const DEFAULT_DURATION = 2 * 365.25 * 86400;
+// Default trajectory duration: 20 years
+const DEFAULT_DURATION = 20 * 365.25 * 86400;
 
 // Compute the full trajectory for a spacecraft
 // spacecraft: { initialState: {x, y, vx, vy}, launchEpoch, events: [{epoch, dvx, dvy}] }
@@ -19,7 +19,7 @@ export function computeTrajectory(spacecraft, duration = DEFAULT_DURATION) {
 
   for (let i = 0; i < events.length; i++) {
     const ev = events[i];
-    if (ev.epoch <= t) continue; // skip past events
+    if (ev.epoch < t) continue; // skip past events
     if (ev.epoch > tEnd) break;
 
     // Integrate from current state to this event

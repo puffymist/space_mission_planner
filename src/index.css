@@ -24,3 +24,8 @@ input, select {
   font-family: inherit;
   font-size: inherit;
 }
+
+select option {
+  background: #1a1a2e;
+  color: #e0e0e0;
+}
