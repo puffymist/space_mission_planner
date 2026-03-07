@@ -12,6 +12,8 @@ export function drawGhosts(ctx, camera, canvas, ghostEpoch, crafts) {
 
   ctx.globalAlpha = 0.4;
 
+  const drawnLabels = [];
+
   // Draw ghost bodies
   for (const body of BODIES) {
     const pos = positions[body.id];
@@ -38,11 +40,30 @@ export function drawGhosts(ctx, camera, canvas, ghostEpoch, crafts) {
     ctx.fillStyle = vis.color;
     ctx.fill();
 
-    // Ghost label
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-    ctx.font = '9px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(body.name, screen.x, screen.y - vis.labelOffset);
+    // Ghost label (with overlap detection)
+    const fontSize = 9;
+    ctx.font = `${fontSize}px sans-serif`;
+    const tw = ctx.measureText(body.name).width;
+    const lx = screen.x - tw / 2;
+    const ly = screen.y - vis.labelOffset - fontSize;
+    const lw = tw;
+    const lh = fontSize + 2;
+
+    let overlaps = false;
+    for (const box of drawnLabels) {
+      if (lx < box.x + box.w && lx + lw > box.x &&
+          ly < box.y + box.h && ly + lh > box.y) {
+        overlaps = true;
+        break;
+      }
+    }
+
+    if (!overlaps) {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.textAlign = 'center';
+      ctx.fillText(body.name, screen.x, screen.y - vis.labelOffset);
+      drawnLabels.push({ x: lx, y: ly, w: lw, h: lh });
+    }
   }
 
   // Draw ghost spacecraft

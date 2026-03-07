@@ -102,9 +102,26 @@ export function setupInteraction(canvas) {
       }
     }
 
-    // 2. Check body orbits
+    // 2. Check body discs (hovering the planet/body itself)
+    const bodyPositions = getAllBodyPositions(epoch);
     if (!bestEpoch) {
-      const bodyPositions = getAllBodyPositions(epoch);
+      for (const body of BODIES) {
+        const bp = bodyPositions[body.id];
+        if (!bp) continue;
+        const dx = bp.x - worldPos.x;
+        const dy = bp.y - worldPos.y;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d < bestDist) {
+          bestDist = d;
+          bestEpoch = epoch; // body is at current sim epoch
+          bestType = 'body';
+          bestId = body.id;
+        }
+      }
+    }
+
+    // 3. Check body orbits
+    if (!bestEpoch) {
       for (const body of BODIES) {
         if (body.id === 'sun' || body.orbitalRadius === 0) continue;
 
