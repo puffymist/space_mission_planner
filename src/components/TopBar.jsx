@@ -8,6 +8,7 @@ import { dateToJ2000 } from '../constants/physics.js';
 const SPEED_PRESETS = [
   { label: '-1 yr/s', value: -365.25 * 86400 },
   { label: '-30 d/s', value: -30 * 86400 },
+  { label: '-7 d/s', value: -7 * 86400 },
   { label: '-1 d/s', value: -86400 },
   { label: '-1 h/s', value: -3600 },
   { label: '-1 min/s', value: -60 },

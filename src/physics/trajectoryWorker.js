@@ -1,6 +1,7 @@
 import { integrateSegment } from './integrator.js';
 import { getAllBodyPositions, getBodyPosition, getBodyVelocity } from './bodyPosition.js';
 import { nearestBody } from './gravity.js';
+import { BODY_MAP } from '../constants/bodies.js';
 
 const ONE_YEAR = 365.25 * 86400;
 const TEN_YEARS = 10 * ONE_YEAR;
@@ -27,9 +28,9 @@ self.onmessage = function (e) {
   let eventIdx = 0;
   const allSegments = [];
 
-  // --- Orbit closure detection state ---
+  // --- Orbit closure detection state (angular-travel based) ---
   let pastAllEvents = false;
-  let closureRef = null; // { relX, relY, relVx, relVy, bodyId, maxDist, coastStart }
+  let closureRef = null; // { trackBody, prevAngle, totalAngle, coastStart, soiCheckCounter }
   let orbitCount = 0;
   let closedOrbit = false;
   const closureIndices = [];
@@ -55,6 +56,10 @@ self.onmessage = function (e) {
         vx = last.vx + ev.dvx;
         vy = last.vy + ev.dvy;
         t = ev.epoch;
+      } else if (ev.epoch === t) {
+        // Event at current time: apply delta-v immediately, no integration needed
+        vx += ev.dvx;
+        vy += ev.dvy;
       }
       eventIdx++;
     }
@@ -64,20 +69,17 @@ self.onmessage = function (e) {
       pastAllEvents = true;
       coastSegStart = allSegments.length;
 
-      // Find dominant body and record relative state
+      // Find tracking body for angular closure detection
       const bodyPositions = getAllBodyPositions(t);
       const { bodyId } = nearestBody({ x, y }, bodyPositions);
       const bodyPos = bodyPositions[bodyId];
-      const bodyVel = getBodyVelocity(bodyId, t);
 
       closureRef = {
-        relX: x - bodyPos.x,
-        relY: y - bodyPos.y,
-        relVx: vx - bodyVel.x,
-        relVy: vy - bodyVel.y,
-        bodyId,
-        maxDist: 0,
+        trackBody: bodyId,
+        prevAngle: Math.atan2(y - bodyPos.y, x - bodyPos.x),
+        totalAngle: 0,
         coastStart: t,
+        soiCheckCounter: 0,
       };
     }
 
@@ -92,59 +94,67 @@ self.onmessage = function (e) {
       vy = last.vy;
       t = chunkEnd;
 
-      // --- Orbit closure check: scan recorded points within this segment ---
+      // --- Orbit closure check: angular-travel based with hierarchy-aware SOI ---
       if (pastAllEvents && closureRef && !closedOrbit) {
-        const refRelSpeed = Math.sqrt(
-          closureRef.relVx * closureRef.relVx + closureRef.relVy * closureRef.relVy
-        );
-
-        // Sample points at intervals (checking every point in a dense segment is expensive)
         const step = Math.max(1, Math.floor(pts.length / 200));
         for (let i = 0; i < pts.length; i += step) {
           const pt = pts[i];
 
-          // Get dominant body position/velocity at this point's time
-          const bPos = getBodyPosition(closureRef.bodyId, pt.t);
-          const bVel = getBodyVelocity(closureRef.bodyId, pt.t);
-
-          // Relative state
+          // Get tracking body position at this time
+          const bPos = getBodyPosition(closureRef.trackBody, pt.t);
           const relX = pt.x - bPos.x;
           const relY = pt.y - bPos.y;
-          const relVx = pt.vx - bVel.x;
-          const relVy = pt.vy - bVel.y;
+          const angle = Math.atan2(relY, relX);
 
-          const dx = relX - closureRef.relX;
-          const dy = relY - closureRef.relY;
-          const posDist = Math.sqrt(dx * dx + dy * dy);
+          // Accumulate angular displacement (handle ±π wraparound)
+          let dAngle = angle - closureRef.prevAngle;
+          if (dAngle > Math.PI) dAngle -= 2 * Math.PI;
+          if (dAngle < -Math.PI) dAngle += 2 * Math.PI;
+          closureRef.totalAngle += dAngle;
+          closureRef.prevAngle = angle;
 
-          if (posDist > closureRef.maxDist) closureRef.maxDist = posDist;
-
-          // Check closure once we've moved significantly away
-          if (closureRef.maxDist > 1e6 && posDist < closureRef.maxDist * 0.02) {
-            const dvx = relVx - closureRef.relVx;
-            const dvy = relVy - closureRef.relVy;
-            const velDist = Math.sqrt(dvx * dvx + dvy * dvy);
-
-            if (velDist < refRelSpeed * 0.02) {
-              orbitCount++;
-              closureIndices.push(coastPointCount + i);
-
-              if (orbitCount >= MAX_COAST_ORBITS) {
-                closedOrbit = true;
-                const trimmedPts = pts.slice(0, i + 1);
-                allSegments[allSegments.length - 1] = trimmedPts;
-                coastPointCount += i + 1;
-
-                self.postMessage({
-                  type: 'done',
-                  craftId: craft.id,
-                  segments: allSegments,
-                  closedOrbit: true,
-                  closureIndices,
-                  coastSegStart,
-                });
-                return;
+          // Periodically check for SOI transition (every ~10 samples)
+          closureRef.soiCheckCounter++;
+          if (closureRef.soiCheckCounter >= 10) {
+            closureRef.soiCheckCounter = 0;
+            const bodyPositions = getAllBodyPositions(pt.t);
+            const { bodyId: nearest } = nearestBody(pt, bodyPositions);
+            if (nearest !== closureRef.trackBody) {
+              // Hierarchy rule: if nearest is a child of tracking body, ignore
+              const nearestInfo = BODY_MAP[nearest];
+              if (!nearestInfo || nearestInfo.parent !== closureRef.trackBody) {
+                // Real SOI transition — switch tracking body, reset angle
+                closureRef.trackBody = nearest;
+                const newPos = bodyPositions[nearest];
+                closureRef.prevAngle = Math.atan2(pt.y - newPos.y, pt.x - newPos.x);
+                closureRef.totalAngle = 0;
+                orbitCount = 0;
+                closureIndices.length = 0;
               }
+            }
+          }
+
+          // Check for orbit completion (each 2π of angular travel)
+          const completedOrbits = Math.floor(Math.abs(closureRef.totalAngle) / (2 * Math.PI));
+          if (completedOrbits > orbitCount) {
+            orbitCount = completedOrbits;
+            closureIndices.push(coastPointCount + i);
+
+            if (orbitCount >= MAX_COAST_ORBITS) {
+              closedOrbit = true;
+              const trimmedPts = pts.slice(0, i + 1);
+              allSegments[allSegments.length - 1] = trimmedPts;
+              coastPointCount += i + 1;
+
+              self.postMessage({
+                type: 'done',
+                craftId: craft.id,
+                segments: allSegments,
+                closedOrbit: true,
+                closureIndices,
+                coastSegStart,
+              });
+              return;
             }
           }
         }

@@ -17,8 +17,15 @@ function App() {
       <ImportExport />
       <CameraHelper />
       <EpochSlider />
-      <SpacecraftPanel />
-      <DeltaVPanel />
+      <div style={{
+        position: 'absolute', top: 44, right: 8,
+        display: 'flex', flexDirection: 'column', gap: 8,
+        maxHeight: 'calc(100vh - 100px)',
+        zIndex: 10, pointerEvents: 'none',
+      }}>
+        <SpacecraftPanel />
+        <DeltaVPanel />
+      </div>
       <HohmannPanel />
       <TrajectoryInfo />
     </div>

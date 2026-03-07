@@ -66,6 +66,9 @@ export default function DeltaVPanel() {
   const [initVx, setInitVx] = useState(null);
   const [initVy, setInitVy] = useState(null);
 
+  // Init state editing (must be before early return to satisfy Rules of Hooks)
+  const [initManual, setInitManual] = useState(false);
+
   const craft = crafts.find((c) => c.id === selectedCraftId);
 
   // Live preview: debounced trajectory computation
@@ -166,9 +169,11 @@ export default function DeltaVPanel() {
     useUIStore.setState({ maneuverPreview: null });
   };
 
-  // Init state editing
+  const hasLaunchSpec = craft && craft.launchDirection && craft.originBodyId && craft.orbitAltitude;
+
   const handleEditInit = () => {
     setEditingInit(true);
+    setInitManual(false);
     setEditingIndex(null);
     setEditEpoch(null);
     setInitEpoch(craft.launchEpoch);
@@ -179,13 +184,18 @@ export default function DeltaVPanel() {
   };
 
   const handleUpdateInit = () => {
-    updateInitialState(craft.id, {
-      launchEpoch: initEpoch,
-      x: initX * 1000, // km → m
-      y: initY * 1000,
-      vx: initVx,
-      vy: initVy,
-    });
+    if (hasLaunchSpec && !initManual) {
+      // Epoch-only update — store will recompute state from launch spec
+      updateInitialState(craft.id, { launchEpoch: initEpoch });
+    } else {
+      updateInitialState(craft.id, {
+        launchEpoch: initEpoch,
+        x: initX * 1000, // km → m
+        y: initY * 1000,
+        vx: initVx,
+        vy: initVy,
+      });
+    }
     setEditingInit(false);
   };
 
@@ -347,46 +357,60 @@ export default function DeltaVPanel() {
                   onClick={(e) => e.stopPropagation()}
                 />
               </div>
-              <div style={styles.initEditRow}>
-                <span style={styles.initEditLabel}>X (km):</span>
-                <input
-                  type="number"
-                  value={Math.round(initX)}
-                  onChange={(e) => setInitX(Number(e.target.value))}
-                  style={styles.initNumInput}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              </div>
-              <div style={styles.initEditRow}>
-                <span style={styles.initEditLabel}>Y (km):</span>
-                <input
-                  type="number"
-                  value={Math.round(initY)}
-                  onChange={(e) => setInitY(Number(e.target.value))}
-                  style={styles.initNumInput}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              </div>
-              <div style={styles.initEditRow}>
-                <span style={styles.initEditLabel}>Vx (m/s):</span>
-                <input
-                  type="number"
-                  value={Math.round(initVx * 10) / 10}
-                  onChange={(e) => setInitVx(Number(e.target.value))}
-                  style={styles.initNumInput}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              </div>
-              <div style={styles.initEditRow}>
-                <span style={styles.initEditLabel}>Vy (m/s):</span>
-                <input
-                  type="number"
-                  value={Math.round(initVy * 10) / 10}
-                  onChange={(e) => setInitVy(Number(e.target.value))}
-                  style={styles.initNumInput}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              </div>
+              {hasLaunchSpec && !initManual ? (
+                <>
+                  <div style={styles.initDetail}>
+                    {BODY_MAP[craft.originBodyId]?.name} · {formatDistance(craft.orbitAltitude)} · {craft.launchDirection}
+                  </div>
+                  <div style={{ fontSize: 9, color: '#888', cursor: 'pointer' }}
+                    onClick={(e) => { e.stopPropagation(); setInitManual(true); }}>
+                    Edit state manually
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={styles.initEditRow}>
+                    <span style={styles.initEditLabel}>X (km):</span>
+                    <input
+                      type="number"
+                      value={Math.round(initX)}
+                      onChange={(e) => setInitX(Number(e.target.value))}
+                      style={styles.initNumInput}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                  <div style={styles.initEditRow}>
+                    <span style={styles.initEditLabel}>Y (km):</span>
+                    <input
+                      type="number"
+                      value={Math.round(initY)}
+                      onChange={(e) => setInitY(Number(e.target.value))}
+                      style={styles.initNumInput}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                  <div style={styles.initEditRow}>
+                    <span style={styles.initEditLabel}>Vx (m/s):</span>
+                    <input
+                      type="number"
+                      value={Math.round(initVx * 10) / 10}
+                      onChange={(e) => setInitVx(Number(e.target.value))}
+                      style={styles.initNumInput}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                  <div style={styles.initEditRow}>
+                    <span style={styles.initEditLabel}>Vy (m/s):</span>
+                    <input
+                      type="number"
+                      value={Math.round(initVy * 10) / 10}
+                      onChange={(e) => setInitVy(Number(e.target.value))}
+                      style={styles.initNumInput}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                </>
+              )}
               <div style={{ display: 'flex', gap: 4, marginTop: 2 }}>
                 <button onClick={(e) => { e.stopPropagation(); handleUpdateInit(); }} style={styles.initUpdateBtn}>
                   Update
@@ -443,17 +467,15 @@ export default function DeltaVPanel() {
 
 const styles = {
   panel: {
-    position: 'absolute',
-    top: 190,
-    right: 8,
     width: 220,
     background: 'rgba(10, 10, 30, 0.9)',
     border: '1px solid rgba(255,255,255,0.1)',
     borderRadius: 6,
     padding: 8,
-    zIndex: 10,
     backdropFilter: 'blur(8px)',
-    maxHeight: 'calc(100vh - 260px)',
+    pointerEvents: 'auto',
+    flex: 1,
+    minHeight: 0,
     overflowY: 'auto',
   },
   header: {

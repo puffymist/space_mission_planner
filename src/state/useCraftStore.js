@@ -97,6 +97,31 @@ function defaultAltitude(body) {
   return body.orbitalRadius * 0.05;
 }
 
+// Compute launch state for a body orbit specification
+function computeLaunchState(bodyId, epoch, orbitAltitude, direction = 'prograde') {
+  const body = BODY_MAP[bodyId];
+  if (!body) return null;
+  const alt = orbitAltitude > 0 ? orbitAltitude : defaultAltitude(body);
+  const bodyPos = getBodyPosition(bodyId, epoch);
+  const bodyVel = getBodyVelocity(bodyId, epoch);
+
+  let craftPos, craftVel;
+  if (body.parent) {
+    const parentPos = getBodyPosition(body.parent, epoch);
+    const radDir = normalize(sub(bodyPos, parentPos));
+    craftPos = add(bodyPos, scale(radDir, alt));
+    const sign = body.angularVelocity >= 0 ? 1 : -1;
+    const tanDir = { x: -radDir.y * sign, y: radDir.x * sign };
+    const orbitalSpeed = Math.sqrt(G * body.mass / alt);
+    craftVel = add(bodyVel, scale(tanDir, orbitalSpeed));
+  } else {
+    craftPos = { x: bodyPos.x + alt, y: bodyPos.y };
+    const orbitalSpeed = Math.sqrt(G * body.mass / alt);
+    craftVel = { x: bodyVel.x, y: bodyVel.y + orbitalSpeed };
+  }
+  return { x: craftPos.x, y: craftPos.y, vx: craftVel.x, vy: craftVel.y };
+}
+
 const useCraftStore = create((set, get) => ({
   crafts: [],
   selectedCraftId: null,
@@ -107,24 +132,8 @@ const useCraftStore = create((set, get) => ({
     if (!body) return;
 
     const orbitAltitude = altitudeM > 0 ? altitudeM : defaultAltitude(body);
-    const bodyPos = getBodyPosition(bodyId, epoch);
-    const bodyVel = getBodyVelocity(bodyId, epoch);
-
-    let craftPos, craftVel;
-
-    if (body.parent) {
-      const parentPos = getBodyPosition(body.parent, epoch);
-      const radDir = normalize(sub(bodyPos, parentPos));
-      craftPos = add(bodyPos, scale(radDir, orbitAltitude));
-      const sign = body.angularVelocity >= 0 ? 1 : -1;
-      const tanDir = { x: -radDir.y * sign, y: radDir.x * sign };
-      const orbitalSpeed = Math.sqrt(G * body.mass / orbitAltitude);
-      craftVel = add(bodyVel, scale(tanDir, orbitalSpeed));
-    } else {
-      craftPos = { x: bodyPos.x + orbitAltitude, y: bodyPos.y };
-      const orbitalSpeed = Math.sqrt(G * body.mass / orbitAltitude);
-      craftVel = { x: bodyVel.x, y: bodyVel.y + orbitalSpeed };
-    }
+    const state = computeLaunchState(bodyId, epoch, orbitAltitude, 'prograde');
+    if (!state) return;
 
     const id = nextId++;
     const craft = {
@@ -134,7 +143,8 @@ const useCraftStore = create((set, get) => ({
       originBodyId: bodyId,
       launchEpoch: epoch,
       orbitAltitude,
-      initialState: { x: craftPos.x, y: craftPos.y, vx: craftVel.x, vy: craftVel.y },
+      launchDirection: 'prograde',
+      initialState: state,
       events: [],
       segments: null,
     };
@@ -228,8 +238,14 @@ const useCraftStore = create((set, get) => ({
       if (c.id !== craftId) return c;
       const newCraft = { ...c };
       if (updates.launchEpoch !== undefined) newCraft.launchEpoch = updates.launchEpoch;
-      if (updates.x !== undefined || updates.y !== undefined ||
-          updates.vx !== undefined || updates.vy !== undefined) {
+
+      const hasManualEdits = updates.x !== undefined || updates.y !== undefined ||
+          updates.vx !== undefined || updates.vy !== undefined;
+      const epochChanged = updates.launchEpoch !== undefined && updates.launchEpoch !== c.launchEpoch;
+      const hasLaunchSpec = c.originBodyId && c.orbitAltitude && c.launchDirection;
+
+      if (hasManualEdits) {
+        // Manual state editing — clear launch spec
         newCraft.initialState = {
           ...c.initialState,
           ...(updates.x !== undefined ? { x: updates.x } : {}),
@@ -237,6 +253,11 @@ const useCraftStore = create((set, get) => ({
           ...(updates.vx !== undefined ? { vx: updates.vx } : {}),
           ...(updates.vy !== undefined ? { vy: updates.vy } : {}),
         };
+        newCraft.launchDirection = null;
+      } else if (epochChanged && hasLaunchSpec) {
+        // Epoch changed with launch spec — recompute state from spec
+        const newState = computeLaunchState(c.originBodyId, newCraft.launchEpoch, c.orbitAltitude, c.launchDirection);
+        if (newState) newCraft.initialState = newState;
       }
       computeAndExtend(newCraft, set);
       return newCraft;

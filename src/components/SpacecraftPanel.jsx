@@ -87,16 +87,15 @@ export default function SpacecraftPanel() {
 
 const styles = {
   panel: {
-    position: 'absolute',
-    top: 44,
-    right: 8,
     width: 200,
     background: 'rgba(10, 10, 30, 0.9)',
     border: '1px solid rgba(255,255,255,0.1)',
     borderRadius: 6,
     padding: 8,
-    zIndex: 10,
     backdropFilter: 'blur(8px)',
+    pointerEvents: 'auto',
+    maxHeight: '40vh',
+    overflowY: 'auto',
   },
   header: {
     fontSize: 12,
