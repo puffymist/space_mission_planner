@@ -252,6 +252,32 @@ export default function CanvasRenderer() {
         drawSpacecraft(ctx, cam, logicalCanvas, craft, epoch);
       }
 
+      // Drag preview: draw ghost diamond at drag position
+      const dragPreview = ui.dragPreview;
+      if (dragPreview) {
+        const scr = worldToScreen(dragPreview.x, dragPreview.y, cam, logicalCanvas);
+        const dragCraft = crafts.find(c => c.id === dragPreview.craftId);
+        if (dragCraft) {
+          const s = 6;
+          ctx.save();
+          ctx.globalAlpha = 0.6;
+          ctx.beginPath();
+          ctx.moveTo(scr.x, scr.y - s);
+          ctx.lineTo(scr.x + s, scr.y);
+          ctx.lineTo(scr.x, scr.y + s);
+          ctx.lineTo(scr.x - s, scr.y);
+          ctx.closePath();
+          ctx.fillStyle = dragCraft.color;
+          ctx.fill();
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([3, 3]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.restore();
+        }
+      }
+
       // Computing indicator: pulsing dot at end of trajectory being computed
       const computingCrafts = useCraftStore.getState().computingCrafts;
       if (computingCrafts && computingCrafts.size > 0) {

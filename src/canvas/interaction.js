@@ -1,6 +1,8 @@
-import { screenToWorld } from './camera.js';
+import { screenToWorld, worldToScreen } from './camera.js';
 import { dist } from '../utils/vector.js';
-import { getAllBodyPositions } from '../physics/bodyPosition.js';
+import { getAllBodyPositions, getBodyVelocity } from '../physics/bodyPosition.js';
+import { nearestBody } from '../physics/gravity.js';
+import { interpolateState } from '../utils/interpolate.js';
 import BODIES from '../constants/bodies.js';
 import useUIStore from '../state/useUIStore.js';
 import useCameraStore from '../state/useCameraStore.js';
@@ -9,6 +11,8 @@ import useCraftStore from '../state/useCraftStore.js';
 
 export function setupInteraction(canvas) {
   let dragging = false;
+  let dragMode = null; // 'camera' | 'spacecraft'
+  let dragCraftId = null;
   let lastMouseX = 0;
   let lastMouseY = 0;
 
@@ -24,16 +28,53 @@ export function setupInteraction(canvas) {
   }, { passive: false });
 
   canvas.addEventListener('mousedown', (e) => {
-    if (e.button === 0) {
-      dragging = true;
-      lastMouseX = e.offsetX;
-      lastMouseY = e.offsetY;
-      canvas.style.cursor = 'grabbing';
+    if (e.button !== 0) return;
+
+    const cam = useCameraStore.getState();
+    const lc = logicalCanvas();
+    const simEpoch = useSimStore.getState().epoch;
+    const craftState = useCraftStore.getState();
+
+    // Check if near selected spacecraft for entity drag
+    if (craftState.selectedCraftId) {
+      const craft = craftState.crafts.find(c => c.id === craftState.selectedCraftId);
+      if (craft && craft.segments) {
+        const pos = interpolateState(craft.segments, simEpoch);
+        if (pos) {
+          const screen = worldToScreen(pos.x, pos.y, cam, lc);
+          const dx = e.offsetX - screen.x;
+          const dy = e.offsetY - screen.y;
+          if (Math.sqrt(dx * dx + dy * dy) < 12) {
+            dragging = true;
+            dragMode = 'spacecraft';
+            dragCraftId = craft.id;
+            canvas.style.cursor = 'move';
+            return;
+          }
+        }
+      }
     }
+
+    // Default: camera pan
+    dragging = true;
+    dragMode = 'camera';
+    lastMouseX = e.offsetX;
+    lastMouseY = e.offsetY;
+    canvas.style.cursor = 'grabbing';
   });
 
   canvas.addEventListener('mousemove', (e) => {
     if (dragging) {
+      if (dragMode === 'spacecraft') {
+        // Update drag preview position
+        const cam = useCameraStore.getState();
+        const lc = logicalCanvas();
+        const worldPos = screenToWorld(e.offsetX, e.offsetY, cam, lc);
+        useUIStore.setState({ dragPreview: { craftId: dragCraftId, x: worldPos.x, y: worldPos.y } });
+        return;
+      }
+
+      // Camera pan
       const state = useCameraStore.getState();
       const dx = (e.offsetX - lastMouseX) / state.zoom;
       const dy = (e.offsetY - lastMouseY) / state.zoom;
@@ -67,7 +108,6 @@ export function setupInteraction(canvas) {
     for (const craft of crafts) {
       if (!craft.segments) continue;
       for (const seg of craft.segments) {
-        // Sample every few points for speed, then refine
         const step = Math.max(1, Math.floor(seg.length / 500));
         for (let i = 0; i < seg.length; i += step) {
           const pt = seg[i];
@@ -81,7 +121,6 @@ export function setupInteraction(canvas) {
             bestId = craft.id;
           }
         }
-        // Refine around best match
         if (bestType === 'trajectory' && bestId === craft.id) {
           const bestIdx = seg.findIndex(p => p.t === bestEpoch);
           if (bestIdx >= 0) {
@@ -113,7 +152,7 @@ export function setupInteraction(canvas) {
         const d = Math.sqrt(dx * dx + dy * dy);
         if (d < bestDist) {
           bestDist = d;
-          bestEpoch = epoch; // body is at current sim epoch
+          bestEpoch = epoch;
           bestType = 'body';
           bestId = body.id;
         }
@@ -156,6 +195,27 @@ export function setupInteraction(canvas) {
       }
     }
 
+    // Update cursor for spacecraft proximity hint
+    if (!dragging) {
+      const selectedId = useCraftStore.getState().selectedCraftId;
+      if (selectedId) {
+        const craft = crafts.find(c => c.id === selectedId);
+        if (craft && craft.segments) {
+          const pos = interpolateState(craft.segments, epoch);
+          if (pos) {
+            const screen = worldToScreen(pos.x, pos.y, cam, lc);
+            const dx = e.offsetX - screen.x;
+            const dy = e.offsetY - screen.y;
+            if (Math.sqrt(dx * dx + dy * dy) < 12) {
+              canvas.style.cursor = 'grab';
+            } else if (!useUIStore.getState().placementMode) {
+              canvas.style.cursor = 'default';
+            }
+          }
+        }
+      }
+    }
+
     if (bestEpoch !== null) {
       useUIStore.getState().setHover(bestEpoch, bestType, bestId, e.offsetX, e.offsetY);
     } else {
@@ -163,19 +223,47 @@ export function setupInteraction(canvas) {
     }
   });
 
-  canvas.addEventListener('mouseup', () => {
+  canvas.addEventListener('mouseup', (e) => {
+    if (dragging && dragMode === 'spacecraft') {
+      // Commit spacecraft drag
+      const cam = useCameraStore.getState();
+      const lc = logicalCanvas();
+      const worldPos = screenToWorld(e.offsetX, e.offsetY, cam, lc);
+      const epoch = useSimStore.getState().epoch;
+
+      const positions = getAllBodyPositions(epoch);
+      const { bodyId } = nearestBody(worldPos, positions);
+      const bodyVel = getBodyVelocity(bodyId, epoch);
+
+      useCraftStore.getState().updateInitialState(dragCraftId, {
+        x: worldPos.x,
+        y: worldPos.y,
+        vx: bodyVel.x,
+        vy: bodyVel.y,
+      });
+
+      useUIStore.setState({ dragPreview: null });
+    }
+
     dragging = false;
+    dragMode = null;
+    dragCraftId = null;
     canvas.style.cursor = useUIStore.getState().placementMode ? 'crosshair' : 'default';
   });
 
   canvas.addEventListener('mouseleave', () => {
+    if (dragging && dragMode === 'spacecraft') {
+      useUIStore.setState({ dragPreview: null });
+    }
     dragging = false;
+    dragMode = null;
+    dragCraftId = null;
     canvas.style.cursor = 'default';
     useUIStore.getState().clearHover();
   });
 
   canvas.addEventListener('click', (e) => {
-    if (dragging) return;
+    if (dragMode === 'spacecraft') return; // Don't process click after drag
 
     const uiState = useUIStore.getState();
     const cam = useCameraStore.getState();

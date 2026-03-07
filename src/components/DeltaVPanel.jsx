@@ -8,6 +8,7 @@ import { getBodyPosition, getAllBodyPositions } from '../physics/bodyPosition.js
 import { computeTrajectory } from '../physics/trajectory.js';
 import { nearestBody } from '../physics/gravity.js';
 import { formatEpochMedium, formatVelocity, formatDistance } from '../utils/time.js';
+import { j2000ToDate, dateToJ2000 } from '../constants/physics.js';
 import BODIES, { BODY_MAP } from '../constants/bodies.js';
 
 export default function DeltaVPanel() {
@@ -16,6 +17,7 @@ export default function DeltaVPanel() {
   const addDeltaV = useCraftStore((s) => s.addDeltaV);
   const updateDeltaV = useCraftStore((s) => s.updateDeltaV);
   const removeDeltaV = useCraftStore((s) => s.removeDeltaV);
+  const updateInitialState = useCraftStore((s) => s.updateInitialState);
   const epoch = useSimStore((s) => s.epoch);
 
   const [direction, setDirection] = useState('prograde');
@@ -23,8 +25,17 @@ export default function DeltaVPanel() {
   const [refBody, setRefBody] = useState('sun');
   const [dvStep, setDvStep] = useState(100);
   const [customAngle, setCustomAngle] = useState(0);
-  const [editingIndex, setEditingIndex] = useState(null); // null = add mode, number = edit mode
+  const [editingIndex, setEditingIndex] = useState(null);
+  const [editEpoch, setEditEpoch] = useState(null);
   const debounceRef = useRef(null);
+
+  // Init editing state
+  const [editingInit, setEditingInit] = useState(false);
+  const [initEpoch, setInitEpoch] = useState(null);
+  const [initX, setInitX] = useState(null);
+  const [initY, setInitY] = useState(null);
+  const [initVx, setInitVx] = useState(null);
+  const [initVy, setInitVy] = useState(null);
 
   const craft = crafts.find((c) => c.id === selectedCraftId);
 
@@ -35,31 +46,31 @@ export default function DeltaVPanel() {
       return;
     }
 
+    const maneuverEpoch = editingIndex !== null && editEpoch !== null ? editEpoch : epoch;
+
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      const craftState = interpolateState(craft.segments, epoch);
+      const craftState = interpolateState(craft.segments, maneuverEpoch);
       if (!craftState) return;
 
       const dirDef = DIRECTIONS.find(d => d.id === direction);
-      const bodyPos = dirDef?.needsBody ? getBodyPosition(refBody, epoch) : null;
+      const bodyPos = dirDef?.needsBody ? getBodyPosition(refBody, maneuverEpoch) : null;
       const dv = computeDeltaV(direction, magnitude, craftState, bodyPos, customAngle);
 
-      // Create temp craft with the pending maneuver
       const tempEvents = editingIndex !== null
-        ? craft.events.map((ev, i) => i === editingIndex ? { epoch, dvx: dv.dvx, dvy: dv.dvy } : ev)
-        : [...craft.events, { epoch, dvx: dv.dvx, dvy: dv.dvy }];
+        ? craft.events.map((ev, i) => i === editingIndex ? { epoch: maneuverEpoch, dvx: dv.dvx, dvy: dv.dvy } : ev)
+        : [...craft.events, { epoch: maneuverEpoch, dvx: dv.dvx, dvy: dv.dvy }];
 
       const tempCraft = {
         ...craft,
         events: tempEvents.sort((a, b) => a.epoch - b.epoch),
       };
 
-      // Adaptive preview duration: shorter when in close orbit for responsiveness
-      const bodyPositions = getAllBodyPositions(epoch);
+      const bodyPositions = getAllBodyPositions(maneuverEpoch);
       const { dist: nearDist } = nearestBody(craftState, bodyPositions);
       const previewDuration = nearDist < 5e7
-        ? 180 * 86400   // 180 days for close orbits
-        : 2 * 365.25 * 86400; // 2 years for interplanetary
+        ? 180 * 86400
+        : 2 * 365.25 * 86400;
       const segments = computeTrajectory(tempCraft, previewDuration);
       useUIStore.setState({ maneuverPreview: { segments, color: craft.color } });
     }, 150);
@@ -67,7 +78,7 @@ export default function DeltaVPanel() {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [direction, magnitude, refBody, customAngle, epoch, craft?.id, editingIndex]);
+  }, [direction, magnitude, refBody, customAngle, epoch, editEpoch, craft?.id, editingIndex]);
 
   // Clear preview on unmount
   useEffect(() => {
@@ -81,17 +92,19 @@ export default function DeltaVPanel() {
   const isCustom = direction === 'custom';
 
   const handleAddOrUpdate = () => {
-    const craftState = interpolateState(craft.segments, epoch);
+    const maneuverEpoch = editingIndex !== null && editEpoch !== null ? editEpoch : epoch;
+    const craftState = interpolateState(craft.segments, maneuverEpoch);
     if (!craftState) return;
 
-    const bodyPos = needsBody ? getBodyPosition(refBody, epoch) : null;
+    const bodyPos = needsBody ? getBodyPosition(refBody, maneuverEpoch) : null;
     const dv = computeDeltaV(direction, magnitude, craftState, bodyPos, customAngle);
 
     if (editingIndex !== null) {
-      updateDeltaV(craft.id, editingIndex, { epoch, dvx: dv.dvx, dvy: dv.dvy });
+      updateDeltaV(craft.id, editingIndex, { epoch: maneuverEpoch, dvx: dv.dvx, dvy: dv.dvy });
       setEditingIndex(null);
+      setEditEpoch(null);
     } else {
-      addDeltaV(craft.id, epoch, dv.dvx, dv.dvy);
+      addDeltaV(craft.id, maneuverEpoch, dv.dvx, dv.dvy);
     }
     useUIStore.setState({ maneuverPreview: null });
   };
@@ -108,21 +121,51 @@ export default function DeltaVPanel() {
     const ev = craft.events[index];
     const dvMag = Math.sqrt(ev.dvx * ev.dvx + ev.dvy * ev.dvy);
     setMagnitude(dvMag);
-    // Default to custom angle with the event's direction
     const angle = Math.atan2(ev.dvy, ev.dvx) * 180 / Math.PI;
     setDirection('custom');
     setCustomAngle(Math.round(angle * 10) / 10);
     setEditingIndex(index);
-    // Set epoch to event time
+    setEditEpoch(ev.epoch);
     useSimStore.getState().setEpoch(ev.epoch);
   };
 
   const handleCancelEdit = () => {
     setEditingIndex(null);
+    setEditEpoch(null);
     useUIStore.setState({ maneuverPreview: null });
   };
 
-  // Slider range based on step
+  // Init state editing
+  const handleEditInit = () => {
+    setEditingInit(true);
+    setEditingIndex(null);
+    setEditEpoch(null);
+    setInitEpoch(craft.launchEpoch);
+    setInitX(craft.initialState.x / 1000); // display in km
+    setInitY(craft.initialState.y / 1000);
+    setInitVx(craft.initialState.vx);
+    setInitVy(craft.initialState.vy);
+  };
+
+  const handleUpdateInit = () => {
+    updateInitialState(craft.id, {
+      launchEpoch: initEpoch,
+      x: initX * 1000, // km → m
+      y: initY * 1000,
+      vx: initVx,
+      vy: initVy,
+    });
+    setEditingInit(false);
+  };
+
+  const handleCancelInit = () => {
+    setEditingInit(false);
+  };
+
+  // Helper to format datetime-local value
+  const toDatetimeLocal = (t) => j2000ToDate(t).toISOString().slice(0, 19);
+  const fromDatetimeLocal = (val) => dateToJ2000(new Date(val + 'Z'));
+
   const maxMag = dvStep * 100;
 
   return (
@@ -132,7 +175,21 @@ export default function DeltaVPanel() {
       <div style={styles.section}>
         <div style={styles.row}>
           <span style={styles.label}>Epoch:</span>
-          <span style={styles.value}>{formatEpochMedium(epoch)}</span>
+          {editingIndex !== null ? (
+            <input
+              type="datetime-local"
+              value={toDatetimeLocal(editEpoch)}
+              onChange={(e) => {
+                const t = fromDatetimeLocal(e.target.value);
+                setEditEpoch(t);
+                useSimStore.getState().setEpoch(t);
+              }}
+              step="1"
+              style={styles.epochInput}
+            />
+          ) : (
+            <span style={styles.value}>{formatEpochMedium(epoch)}</span>
+          )}
         </div>
 
         <div style={styles.row}>
@@ -238,17 +295,87 @@ export default function DeltaVPanel() {
         <div style={styles.subheader}>Maneuvers</div>
 
         {/* Init params as maneuver 0 */}
-        <div style={styles.initRow}>
+        <div
+          style={{ ...styles.initRow, cursor: 'pointer' }}
+          onClick={handleEditInit}
+          title="Click to edit initial state"
+        >
           <div style={styles.initLabel}>
             #0 Launch
           </div>
-          <div style={styles.initDetail}>
-            {formatEpochMedium(craft.launchEpoch)}
-          </div>
-          <div style={styles.initDetail}>
-            {BODY_MAP[craft.originBodyId]?.name || craft.originBodyId}
-            {craft.orbitAltitude ? ` · ${formatDistance(craft.orbitAltitude)}` : ''}
-          </div>
+          {editingInit ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 3 }}>
+              <div style={styles.initEditRow}>
+                <span style={styles.initEditLabel}>Epoch:</span>
+                <input
+                  type="datetime-local"
+                  value={toDatetimeLocal(initEpoch)}
+                  onChange={(e) => setInitEpoch(fromDatetimeLocal(e.target.value))}
+                  step="1"
+                  style={styles.epochInput}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+              <div style={styles.initEditRow}>
+                <span style={styles.initEditLabel}>X (km):</span>
+                <input
+                  type="number"
+                  value={Math.round(initX)}
+                  onChange={(e) => setInitX(Number(e.target.value))}
+                  style={styles.initNumInput}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+              <div style={styles.initEditRow}>
+                <span style={styles.initEditLabel}>Y (km):</span>
+                <input
+                  type="number"
+                  value={Math.round(initY)}
+                  onChange={(e) => setInitY(Number(e.target.value))}
+                  style={styles.initNumInput}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+              <div style={styles.initEditRow}>
+                <span style={styles.initEditLabel}>Vx (m/s):</span>
+                <input
+                  type="number"
+                  value={Math.round(initVx * 10) / 10}
+                  onChange={(e) => setInitVx(Number(e.target.value))}
+                  style={styles.initNumInput}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+              <div style={styles.initEditRow}>
+                <span style={styles.initEditLabel}>Vy (m/s):</span>
+                <input
+                  type="number"
+                  value={Math.round(initVy * 10) / 10}
+                  onChange={(e) => setInitVy(Number(e.target.value))}
+                  style={styles.initNumInput}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 4, marginTop: 2 }}>
+                <button onClick={(e) => { e.stopPropagation(); handleUpdateInit(); }} style={styles.initUpdateBtn}>
+                  Update
+                </button>
+                <button onClick={(e) => { e.stopPropagation(); handleCancelInit(); }} style={styles.cancelBtn}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div style={styles.initDetail}>
+                {formatEpochMedium(craft.launchEpoch)}
+              </div>
+              <div style={styles.initDetail}>
+                {BODY_MAP[craft.originBodyId]?.name || craft.originBodyId}
+                {craft.orbitAltitude ? ` · ${formatDistance(craft.orbitAltitude)}` : ''}
+              </div>
+            </>
+          )}
         </div>
 
         {craft.events.map((ev, i) => {
@@ -412,6 +539,16 @@ const styles = {
     cursor: 'pointer',
     marginTop: 4,
   },
+  epochInput: {
+    background: 'rgba(255,255,255,0.1)',
+    border: '1px solid rgba(255,255,255,0.2)',
+    color: '#fff',
+    borderRadius: 3,
+    padding: '2px 4px',
+    fontSize: 10,
+    fontFamily: 'monospace',
+    width: 140,
+  },
   initRow: {
     padding: '4px 4px',
     marginBottom: 4,
@@ -429,6 +566,39 @@ const styles = {
     fontSize: 9,
     color: '#aaa',
     fontFamily: 'monospace',
+  },
+  initEditRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 4,
+  },
+  initEditLabel: {
+    fontSize: 9,
+    color: '#8af',
+    minWidth: 50,
+  },
+  initNumInput: {
+    width: 90,
+    background: 'rgba(255,255,255,0.1)',
+    border: '1px solid rgba(100,150,255,0.3)',
+    color: '#fff',
+    borderRadius: 3,
+    padding: '2px 4px',
+    fontSize: 10,
+    textAlign: 'right',
+    fontFamily: 'monospace',
+  },
+  initUpdateBtn: {
+    flex: 1,
+    background: 'rgba(100,150,255,0.2)',
+    border: '1px solid rgba(100,150,255,0.4)',
+    color: '#8af',
+    borderRadius: 4,
+    padding: '3px 0',
+    fontSize: 10,
+    fontWeight: 600,
+    cursor: 'pointer',
   },
   eventRow: {
     display: 'flex',

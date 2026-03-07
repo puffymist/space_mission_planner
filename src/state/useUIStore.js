@@ -16,6 +16,8 @@ const useUIStore = create((set) => ({
   placementMode: false,
   // Live maneuver preview: {segments, color} or null
   maneuverPreview: null,
+  // Drag preview: {craftId, x, y} or null (during spacecraft drag)
+  dragPreview: null,
 
   setHover: (epoch, type, id, sx, sy) => set({
     hoveredEpoch: epoch,
