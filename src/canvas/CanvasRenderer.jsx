@@ -252,6 +252,26 @@ export default function CanvasRenderer() {
         drawSpacecraft(ctx, cam, logicalCanvas, craft, epoch);
       }
 
+      // Computing indicator: pulsing dot at end of trajectory being computed
+      const computingCrafts = useCraftStore.getState().computingCrafts;
+      if (computingCrafts && computingCrafts.size > 0) {
+        const pulse = 0.4 + 0.6 * Math.abs(Math.sin(now / 400));
+        for (const craft of crafts) {
+          if (!computingCrafts.has(craft.id)) continue;
+          if (!craft.segments || craft.segments.length === 0) continue;
+          const lastSeg = craft.segments[craft.segments.length - 1];
+          if (!lastSeg || lastSeg.length === 0) continue;
+          const lastPt = lastSeg[lastSeg.length - 1];
+          const scr = worldToScreen(lastPt.x, lastPt.y, cam, logicalCanvas);
+          ctx.beginPath();
+          ctx.arc(scr.x, scr.y, 4, 0, Math.PI * 2);
+          ctx.fillStyle = craft.color;
+          ctx.globalAlpha = pulse;
+          ctx.fill();
+          ctx.globalAlpha = 1.0;
+        }
+      }
+
       // Scale bar
       drawScaleBar(ctx, cam, logicalCanvas);
 

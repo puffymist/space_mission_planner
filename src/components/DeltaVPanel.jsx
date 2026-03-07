@@ -4,8 +4,9 @@ import useSimStore from '../state/useSimStore.js';
 import useUIStore from '../state/useUIStore.js';
 import { DIRECTIONS, computeDeltaV, circularizeDeltaV } from '../physics/deltaV.js';
 import { interpolateState } from '../utils/interpolate.js';
-import { getBodyPosition } from '../physics/bodyPosition.js';
+import { getBodyPosition, getAllBodyPositions } from '../physics/bodyPosition.js';
 import { computeTrajectory } from '../physics/trajectory.js';
+import { nearestBody } from '../physics/gravity.js';
 import { formatEpochMedium, formatVelocity, formatDistance } from '../utils/time.js';
 import BODIES, { BODY_MAP } from '../constants/bodies.js';
 
@@ -53,9 +54,13 @@ export default function DeltaVPanel() {
         events: tempEvents.sort((a, b) => a.epoch - b.epoch),
       };
 
-      // Short duration for speed (2 years)
-      const TWO_YEARS = 2 * 365.25 * 86400;
-      const segments = computeTrajectory(tempCraft, TWO_YEARS);
+      // Adaptive preview duration: shorter when in close orbit for responsiveness
+      const bodyPositions = getAllBodyPositions(epoch);
+      const { dist: nearDist } = nearestBody(craftState, bodyPositions);
+      const previewDuration = nearDist < 5e7
+        ? 180 * 86400   // 180 days for close orbits
+        : 2 * 365.25 * 86400; // 2 years for interplanetary
+      const segments = computeTrajectory(tempCraft, previewDuration);
       useUIStore.setState({ maneuverPreview: { segments, color: craft.color } });
     }, 150);
 

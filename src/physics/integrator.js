@@ -2,7 +2,7 @@ import { computeAcceleration } from './gravity.js';
 import { getAllBodyPositions } from './bodyPosition.js';
 
 const DT_MIN = 10;      // minimum time step: 10 seconds
-const DT_MAX = 3600;    // maximum time step: 1 hour
+const DT_MAX = 86400;   // maximum time step: 24 hour
 const SAFETY = 0.01;    // fraction of distance-to-nearest-body per step
 
 // Compute adaptive time step based on proximity to bodies
