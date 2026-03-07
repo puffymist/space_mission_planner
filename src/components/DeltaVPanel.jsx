@@ -5,11 +5,40 @@ import useUIStore from '../state/useUIStore.js';
 import { DIRECTIONS, computeDeltaV, circularizeDeltaV } from '../physics/deltaV.js';
 import { interpolateState } from '../utils/interpolate.js';
 import { getBodyPosition, getAllBodyPositions } from '../physics/bodyPosition.js';
-import { computeTrajectory } from '../physics/trajectory.js';
 import { nearestBody } from '../physics/gravity.js';
 import { formatEpochMedium, formatVelocity, formatDistance } from '../utils/time.js';
 import { j2000ToDate, dateToJ2000 } from '../constants/physics.js';
 import BODIES, { BODY_MAP } from '../constants/bodies.js';
+
+// --- Preview worker for non-blocking maneuver preview ---
+let previewWorker = null;
+
+function computePreviewAsync(tempCraft, duration, callback) {
+  if (previewWorker) previewWorker.terminate();
+  previewWorker = new Worker(
+    new URL('../physics/trajectoryWorker.js', import.meta.url),
+    { type: 'module' }
+  );
+  previewWorker.onmessage = (e) => {
+    if (e.data.type === 'progress' || e.data.type === 'done') {
+      callback(e.data.segments);
+      if (e.data.type === 'done') {
+        previewWorker = null;
+      }
+    }
+  };
+  previewWorker.postMessage({
+    type: 'compute',
+    craft: {
+      id: tempCraft.id,
+      initialState: tempCraft.initialState,
+      launchEpoch: tempCraft.launchEpoch,
+      events: tempCraft.events,
+    },
+    duration,
+    firstChunkDuration: Math.min(duration, 90 * 86400),
+  });
+}
 
 export default function DeltaVPanel() {
   const selectedCraftId = useCraftStore((s) => s.selectedCraftId);
@@ -71,12 +100,14 @@ export default function DeltaVPanel() {
       const previewDuration = nearDist < 5e7
         ? 180 * 86400
         : 2 * 365.25 * 86400;
-      const segments = computeTrajectory(tempCraft, previewDuration);
-      useUIStore.setState({ maneuverPreview: { segments, color: craft.color } });
+      computePreviewAsync(tempCraft, previewDuration, (segments) => {
+        useUIStore.setState({ maneuverPreview: { segments, color: craft.color } });
+      });
     }, 150);
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (previewWorker) { previewWorker.terminate(); previewWorker = null; }
     };
   }, [direction, magnitude, refBody, customAngle, epoch, editEpoch, craft?.id, editingIndex]);
 

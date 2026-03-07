@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { getBodyPosition, getBodyVelocity, getAllBodyPositions } from '../physics/bodyPosition.js';
 import { BODY_MAP } from '../constants/bodies.js';
-import { computeTrajectory } from '../physics/trajectory.js';
 import { sub, normalize, scale, add } from '../utils/vector.js';
 import { nearestBody } from '../physics/gravity.js';
 
@@ -9,7 +8,6 @@ let nextId = 1;
 
 const CRAFT_COLORS = ['#00ff88', '#ff6644', '#44aaff', '#ffaa00', '#ff44ff', '#44ffff'];
 const G = 6.6743e-11;
-const SHORT_DURATION = 2 * 365.25 * 86400; // 2 years for immediate feedback
 const FULL_DURATION = 100 * 365.25 * 86400; // 100 years for background worker
 
 // --- Web Worker lifecycle ---
@@ -30,13 +28,20 @@ function startComputation(craft, set) {
   activeWorkers[craft.id] = worker;
 
   worker.onmessage = (e) => {
-    const { type, craftId, segments } = e.data;
+    const { type, craftId, segments, closedOrbit, closureIndices, coastSegStart } = e.data;
 
     if (type === 'progress' || type === 'done') {
       set((state) => {
-        const newCrafts = state.crafts.map((c) =>
-          c.id === craftId ? { ...c, segments } : c
-        );
+        const newCrafts = state.crafts.map((c) => {
+          if (c.id !== craftId) return c;
+          const updated = { ...c, segments };
+          if (type === 'done') {
+            updated.closedOrbit = closedOrbit || false;
+            updated.closureIndices = closureIndices || [];
+            updated.coastSegStart = coastSegStart || 0;
+          }
+          return updated;
+        });
         const newComputing = new Set(state.computingCrafts);
         if (type === 'done') newComputing.delete(craftId);
         return { crafts: newCrafts, computingCrafts: newComputing };
@@ -73,13 +78,14 @@ function startComputation(craft, set) {
       events: craft.events,
     },
     duration: FULL_DURATION,
+    firstChunkDuration: 90 * 86400, // 90 days for fast initial feedback
   });
 }
 
-// Compute short trajectory synchronously, then kick off worker for full
+// Kick off worker for trajectory computation.
+// Old segments stay visible until the first worker progress message replaces them.
 function computeAndExtend(craft, set) {
-  craft.segments = computeTrajectory(craft, SHORT_DURATION);
-  queueMicrotask(() => startComputation(craft, set));
+  startComputation(craft, set);
 }
 
 // Compute default orbit altitude for a body (in meters)

@@ -243,7 +243,7 @@ export default function CanvasRenderer() {
 
       // Trajectories
       for (const craft of crafts) {
-        drawTrajectory(ctx, cam, logicalCanvas, craft.segments, craft.color, epoch, epochStep);
+        drawTrajectory(ctx, cam, logicalCanvas, craft.segments, craft.color, epoch, epochStep, craft);
       }
 
       drawBodies(ctx, cam, logicalCanvas, bodyPositions);
