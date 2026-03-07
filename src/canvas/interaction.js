@@ -83,6 +83,7 @@ export function setupInteraction(canvas) {
         centerY: state.centerY + dy,
         trackTarget: null,
         trackType: null,
+        frameType: 'inertial',
       });
       lastMouseX = e.offsetX;
       lastMouseY = e.offsetY;
@@ -304,6 +305,6 @@ export function setupInteraction(canvas) {
   });
 
   canvas.addEventListener('dblclick', () => {
-    useCameraStore.setState({ trackTarget: null, trackType: null });
+    useCameraStore.setState({ trackTarget: null, trackType: null, frameType: 'inertial' });
   });
 }

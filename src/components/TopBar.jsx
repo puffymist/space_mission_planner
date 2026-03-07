@@ -1,19 +1,24 @@
 import { useState } from 'react';
 import useSimStore from '../state/useSimStore.js';
+import useCameraStore from '../state/useCameraStore.js';
+import { BODY_MAP } from '../constants/bodies.js';
 import { formatEpoch } from '../utils/time.js';
 import { dateToJ2000 } from '../constants/physics.js';
 
 const SPEED_PRESETS = [
-  { label: '-1yr/s', value: -365.25 * 86400 },
-  { label: '-30d/s', value: -30 * 86400 },
-  { label: '-1d/s', value: -86400 },
-  { label: '-1h/s', value: -3600 },
-  { label: '1x', value: 1 },
-  { label: '1h/s', value: 3600 },
-  { label: '1d/s', value: 86400 },
-  { label: '7d/s', value: 7 * 86400 },
-  { label: '30d/s', value: 30 * 86400 },
-  { label: '1yr/s', value: 365.25 * 86400 },
+  { label: '-1 yr/s', value: -365.25 * 86400 },
+  { label: '-30 d/s', value: -30 * 86400 },
+  { label: '-1 d/s', value: -86400 },
+  { label: '-1 h/s', value: -3600 },
+  { label: '-1 min/s', value: -60 },
+  { label: '-1 s/s', value: -1 },
+  { label: '1 s/s', value: 1 },
+  { label: '1 min/s', value: 60 },
+  { label: '1 h/s', value: 3600 },
+  { label: '1 d/s', value: 86400 },
+  { label: '7 d/s', value: 7 * 86400 },
+  { label: '30 d/s', value: 30 * 86400 },
+  { label: '1 yr/s', value: 365.25 * 86400 },
 ];
 
 // Parse a date/time string to J2000 seconds
@@ -39,6 +44,14 @@ export default function TopBar() {
   const setSpeed = useSimStore((s) => s.setSpeed);
   const setEpoch = useSimStore((s) => s.setEpoch);
   const [epochInput, setEpochInput] = useState('');
+
+  const frameType = useCameraStore((s) => s.frameType);
+  const trackTarget = useCameraStore((s) => s.trackTarget);
+  const trackType = useCameraStore((s) => s.trackType);
+  const toggleFrame = useCameraStore((s) => s.toggleFrame);
+
+  // Rotating frame only available when tracking a non-Sun body with a parent
+  const canRotate = trackTarget && trackType === 'body' && trackTarget !== 'sun' && BODY_MAP[trackTarget]?.parent;
 
   const handleEpochSubmit = () => {
     const t = parseEpochInput(epochInput);
@@ -70,6 +83,15 @@ export default function TopBar() {
         style={styles.epochInput}
       />
       <button onClick={handleEpochSubmit} style={styles.setBtn}>Set</button>
+      {canRotate && (
+        <button
+          onClick={toggleFrame}
+          style={frameType === 'rotating' ? styles.frameActive : styles.frameBtn}
+          title="Toggle rotating reference frame (R)"
+        >
+          {frameType === 'rotating' ? 'Rotating' : 'Inertial'}
+        </button>
+      )}
     </div>
   );
 }
@@ -137,5 +159,25 @@ const styles = {
     padding: '2px 8px',
     fontSize: 11,
     cursor: 'pointer',
+  },
+  frameBtn: {
+    background: 'rgba(255,255,255,0.1)',
+    border: '1px solid rgba(255,255,255,0.2)',
+    color: '#ccc',
+    borderRadius: 4,
+    padding: '2px 8px',
+    fontSize: 11,
+    cursor: 'pointer',
+    marginLeft: 'auto',
+  },
+  frameActive: {
+    background: 'rgba(100,150,255,0.3)',
+    border: '1px solid rgba(100,150,255,0.6)',
+    color: '#8af',
+    borderRadius: 4,
+    padding: '2px 8px',
+    fontSize: 11,
+    cursor: 'pointer',
+    marginLeft: 'auto',
   },
 };

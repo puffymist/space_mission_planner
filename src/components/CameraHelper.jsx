@@ -79,6 +79,7 @@ export default function CameraHelper() {
       zoom: preset.zoom,
       trackTarget: null,
       trackType: null,
+      frameType: 'inertial',
     });
   };
 

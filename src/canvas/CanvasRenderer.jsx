@@ -121,20 +121,26 @@ export default function CanvasRenderer() {
           useCameraStore.setState({ zoom: cam.zoom / 1.5 });
           break;
         case 'ArrowLeft':
-          useCameraStore.setState({ centerX: cam.centerX - panAmount, trackTarget: null, trackType: null });
+          useCameraStore.setState({ centerX: cam.centerX - panAmount, trackTarget: null, trackType: null, frameType: 'inertial' });
           break;
         case 'ArrowRight':
-          useCameraStore.setState({ centerX: cam.centerX + panAmount, trackTarget: null, trackType: null });
+          useCameraStore.setState({ centerX: cam.centerX + panAmount, trackTarget: null, trackType: null, frameType: 'inertial' });
           break;
         case 'ArrowUp':
-          useCameraStore.setState({ centerY: cam.centerY + panAmount, trackTarget: null, trackType: null });
+          useCameraStore.setState({ centerY: cam.centerY + panAmount, trackTarget: null, trackType: null, frameType: 'inertial' });
           break;
         case 'ArrowDown':
-          useCameraStore.setState({ centerY: cam.centerY - panAmount, trackTarget: null, trackType: null });
+          useCameraStore.setState({ centerY: cam.centerY - panAmount, trackTarget: null, trackType: null, frameType: 'inertial' });
           break;
         case 'p':
         case 'P':
           useUIStore.setState((s) => ({ placementMode: !s.placementMode }));
+          break;
+        case 'r':
+        case 'R':
+          if (cam.trackTarget && cam.trackType === 'body' && cam.trackTarget !== 'sun' && BODY_MAP[cam.trackTarget]?.parent) {
+            useCameraStore.getState().toggleFrame();
+          }
           break;
         default: {
           // Digit keys: jump to body
@@ -179,11 +185,36 @@ export default function CanvasRenderer() {
           targetPos = getBodyPosition(camera.trackTarget, epoch);
         }
         if (targetPos) {
-          useCameraStore.setState({ centerX: targetPos.x, centerY: targetPos.y });
+          // In rotating frame, set center to the rotated position of the tracked body
+          if (camera.frameType === 'rotating' && camera.trackType === 'body') {
+            const body = BODY_MAP[camera.trackTarget];
+            if (body && body.parent) {
+              const parentPos = getBodyPosition(body.parent, epoch);
+              const angle = body.initialAngle + body.angularVelocity * epoch;
+              const cos = Math.cos(-angle), sin = Math.sin(-angle);
+              const dx = targetPos.x - parentPos.x, dy = targetPos.y - parentPos.y;
+              const rx = dx * cos - dy * sin + parentPos.x;
+              const ry = dx * sin + dy * cos + parentPos.y;
+              useCameraStore.setState({ centerX: rx, centerY: ry });
+            } else {
+              useCameraStore.setState({ centerX: targetPos.x, centerY: targetPos.y });
+            }
+          } else {
+            useCameraStore.setState({ centerX: targetPos.x, centerY: targetPos.y });
+          }
         }
       }
 
-      const cam = useCameraStore.getState();
+      // Build camera object, enriched with rotatingCtx if in rotating frame
+      let cam = useCameraStore.getState();
+      if (cam.frameType === 'rotating' && cam.trackTarget && cam.trackType === 'body') {
+        const body = BODY_MAP[cam.trackTarget];
+        if (body && body.parent) {
+          const parentPos = getBodyPosition(body.parent, epoch);
+          const angle = body.initialAngle + body.angularVelocity * epoch;
+          cam = { ...cam, rotatingCtx: { pivotX: parentPos.x, pivotY: parentPos.y, angle } };
+        }
+      }
 
       const logicalCanvas = {
         width: canvas._logicalWidth || canvas.width,

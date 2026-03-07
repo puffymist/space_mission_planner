@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { AU } from '../constants/physics.js';
+import { screenToWorld } from '../canvas/camera.js';
 
 const useCameraStore = create((set) => ({
   // Camera center in world coordinates (meters)
@@ -11,18 +12,22 @@ const useCameraStore = create((set) => ({
   trackTarget: null,
   // Type of tracking: 'body' or 'craft'
   trackType: null,
+  // Reference frame: 'inertial' (heliocentric) or 'rotating' (co-rotating with tracked body)
+  frameType: 'inertial',
 
   setCenter: (x, y) => set({ centerX: x, centerY: y }),
   setZoom: (zoom) => set({ zoom }),
-  setTrackTarget: (bodyId) => set({ trackTarget: bodyId }),
+  setTrackTarget: (bodyId) => set({ trackTarget: bodyId, frameType: 'inertial' }),
+  toggleFrame: () => set((s) => ({
+    frameType: s.frameType === 'inertial' ? 'rotating' : 'inertial',
+  })),
 
-  // Zoom centered on a screen point
+  // Zoom centered on a screen point (rotation-aware via screenToWorld)
   zoomAt: (factor, screenX, screenY, canvas) => set((state) => {
-    const worldX = (screenX - canvas.width / 2) / state.zoom + state.centerX;
-    const worldY = (canvas.height / 2 - screenY) / state.zoom + state.centerY;
+    const world = screenToWorld(screenX, screenY, state, canvas);
     const newZoom = state.zoom * factor;
-    const newCenterX = worldX - (screenX - canvas.width / 2) / newZoom;
-    const newCenterY = worldY + (screenY - canvas.height / 2) / newZoom;
+    const newCenterX = world.x - (screenX - canvas.width / 2) / newZoom;
+    const newCenterY = world.y + (screenY - canvas.height / 2) / newZoom;
     return { zoom: newZoom, centerX: newCenterX, centerY: newCenterY };
   }),
 }));
