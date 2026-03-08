@@ -98,7 +98,7 @@ const BODIES = [
     parent: 'earth',
     orbitalRadius: 3.844e8,
     orbitalPeriod: 27.322 * 86400,
-    initialAngle: 0,
+    initialAngle: 223.32 * DEG,
   },
 
   // Jupiter's Galilean moons
@@ -109,7 +109,7 @@ const BODIES = [
     parent: 'jupiter',
     orbitalRadius: 4.217e8,
     orbitalPeriod: 1.769 * 86400,
-    initialAngle: 0,
+    initialAngle: 17.92 * DEG,
   },
   {
     id: 'europa',
@@ -118,7 +118,7 @@ const BODIES = [
     parent: 'jupiter',
     orbitalRadius: 6.711e8,
     orbitalPeriod: 3.551 * 86400,
-    initialAngle: 0,
+    initialAngle: 212.39 * DEG,
   },
   {
     id: 'ganymede',
@@ -127,7 +127,7 @@ const BODIES = [
     parent: 'jupiter',
     orbitalRadius: 1.070e9,
     orbitalPeriod: 7.155 * 86400,
-    initialAngle: 0,
+    initialAngle: 219.84 * DEG,
   },
   {
     id: 'callisto',
@@ -136,7 +136,7 @@ const BODIES = [
     parent: 'jupiter',
     orbitalRadius: 1.883e9,
     orbitalPeriod: 16.69 * 86400,
-    initialAngle: 0,
+    initialAngle: 80.05 * DEG,
   },
 
   // Saturn's Titan
@@ -147,10 +147,11 @@ const BODIES = [
     parent: 'saturn',
     orbitalRadius: 1.222e9,
     orbitalPeriod: 15.945 * 86400,
-    initialAngle: 0,
+    initialAngle: 141.00 * DEG,
   },
 
   // Neptune's Triton (RETROGRADE: negative period encodes clockwise orbit)
+  /*
   {
     id: 'triton',
     name: 'Triton',
@@ -160,6 +161,7 @@ const BODIES = [
     orbitalPeriod: -5.877 * 86400, // negative = retrograde
     initialAngle: 0,
   },
+  */
 ];
 
 // Precompute angular velocity for each body

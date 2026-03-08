@@ -48,8 +48,15 @@ export default function ImportExport() {
             originBodyId: c.originBodyId || 'earth',
             launchEpoch: c.launchEpoch,
             orbitAltitude: c.orbitAltitude || null,
+            launchDirection: c.launchDirection || null,
+            launchPhase: c.launchPhase || 0,
+            launchLinkedGroup: c.launchLinkedGroup || undefined,
             initialState: c.initialState,
-            events: c.events || [],
+            events: (c.events || []).map(e => ({
+              epoch: e.epoch, dvx: e.dvx, dvy: e.dvy,
+              ...(e.spec ? { spec: e.spec } : {}),
+              ...(e.linkedGroup ? { linkedGroup: e.linkedGroup } : {}),
+            })),
             segments: null,
           };
           craft.segments = computeTrajectory(craft);

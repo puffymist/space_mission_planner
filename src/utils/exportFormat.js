@@ -1,7 +1,7 @@
 // Export/import spacecraft missions as JSON
 // Only stores initial state + delta-v events (trajectories are recomputed on import)
 
-const FORMAT_VERSION = 1;
+const FORMAT_VERSION = 2;
 
 export function exportMission(crafts, epoch) {
   return JSON.stringify({
@@ -14,12 +14,15 @@ export function exportMission(crafts, epoch) {
       launchEpoch: c.launchEpoch,
       orbitAltitude: c.orbitAltitude || null,
       launchDirection: c.launchDirection || null,
+      launchPhase: c.launchPhase || 0,
+      launchLinkedGroup: c.launchLinkedGroup || null,
       initialState: c.initialState,
-      events: c.events.map(e => ({
-        epoch: e.epoch,
-        dvx: e.dvx,
-        dvy: e.dvy,
-      })),
+      events: c.events.map(e => {
+        const ev = { epoch: e.epoch, dvx: e.dvx, dvy: e.dvy };
+        if (e.spec) ev.spec = e.spec;
+        if (e.linkedGroup) ev.linkedGroup = e.linkedGroup;
+        return ev;
+      }),
     })),
   }, null, 2);
 }
