@@ -1,0 +1,236 @@
+:root {
+  --bg-primary: #0a0a1a;
+  --bg-card: rgba(10, 10, 30, 0.9);
+  --text-primary: #e0e0e0;
+  --text-muted: #888;
+  --accent-blue: #88aaff;
+  --accent-orange: #ffaa88;
+  --border: rgba(255, 255, 255, 0.1);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  line-height: 1.6;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Starfield background */
+.stars {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 30% 65%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1px 1px at 55% 10%, rgba(255,255,255,0.4), transparent),
+    radial-gradient(1px 1px at 70% 40%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1px 1px at 85% 75%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 15% 80%, rgba(255,255,255,0.3), transparent),
+    radial-gradient(1px 1px at 45% 50%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1px 1px at 90% 15%, rgba(255,255,255,0.4), transparent),
+    radial-gradient(1px 1px at 25% 35%, rgba(255,255,255,0.3), transparent),
+    radial-gradient(1px 1px at 60% 85%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1.5px 1.5px at 5% 50%, rgba(136,170,255,0.7), transparent),
+    radial-gradient(1.5px 1.5px at 75% 25%, rgba(255,170,136,0.5), transparent),
+    radial-gradient(1px 1px at 40% 90%, rgba(255,255,255,0.4), transparent),
+    radial-gradient(1px 1px at 95% 55%, rgba(255,255,255,0.3), transparent),
+    radial-gradient(1px 1px at 50% 30%, rgba(255,255,255,0.5), transparent);
+  animation: twinkle 8s ease-in-out infinite alternate;
+}
+
+@keyframes twinkle {
+  0% { opacity: 0.7; }
+  100% { opacity: 1; }
+}
+
+main {
+  position: relative;
+  z-index: 1;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* Hero */
+.hero {
+  text-align: center;
+  padding: 120px 0 80px;
+}
+
+.hero h1 {
+  font-size: 3rem;
+  font-weight: 300;
+  color: var(--accent-blue);
+  letter-spacing: 0.02em;
+  margin-bottom: 12px;
+}
+
+.tagline {
+  font-size: 1.15rem;
+  color: var(--text-muted);
+}
+
+/* Sections */
+section {
+  margin-bottom: 64px;
+}
+
+h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+}
+
+/* Card grid */
+.card-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.projects .card-grid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+/* Project cards */
+.card {
+  display: block;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px;
+  text-decoration: none;
+  color: var(--text-primary);
+  transition: border-color 0.2s, transform 0.2s;
+  backdrop-filter: blur(8px);
+}
+
+.card:hover {
+  border-color: var(--accent-blue);
+  transform: translateY(-2px);
+}
+
+.card h3 {
+  font-size: 1.15rem;
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.card p {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.card-link {
+  font-size: 0.85rem;
+  color: var(--accent-blue);
+  font-weight: 500;
+}
+
+/* Feature cards */
+.features-grid {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.feature-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  backdrop-filter: blur(8px);
+}
+
+.feature-icon {
+  font-size: 1.5rem;
+  margin-bottom: 8px;
+  color: var(--accent-orange);
+}
+
+.feature-card h3 {
+  font-size: 0.95rem;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.feature-card p {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* Footer */
+footer {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  padding: 40px 24px 60px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.footer-link {
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.footer-link:hover {
+  color: var(--accent-blue);
+}
+
+.footer-sep {
+  margin: 0 12px;
+  opacity: 0.4;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .hero {
+    padding: 80px 0 60px;
+  }
+
+  .hero h1 {
+    font-size: 2.2rem;
+  }
+
+  .features-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .hero h1 {
+    font-size: 1.8rem;
+  }
+
+  .tagline {
+    font-size: 1rem;
+  }
+
+  .features-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .projects .card-grid {
+    grid-template-columns: 1fr;
+  }
+}

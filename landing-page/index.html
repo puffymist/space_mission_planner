@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>puffymist</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='6' fill='%2388aaff'/><ellipse cx='16' cy='16' rx='14' ry='5' fill='none' stroke='%2388aaff' stroke-width='1.5' opacity='0.6'/></svg>">
+</head>
+<body>
+  <div class="stars" aria-hidden="true"></div>
+
+  <main>
+    <section class="hero">
+      <h1>puffymist</h1>
+      <p class="tagline">Building tools for exploring orbital mechanics</p>
+    </section>
+
+    <section class="projects">
+      <h2>Projects</h2>
+      <div class="card-grid">
+        <a href="https://puffymist.github.io/space_mission_planner/" class="card">
+          <h3>Space Mission Planner</h3>
+          <p>A 2D orbital mechanics simulator for planning interplanetary missions. Launch spacecraft, compute Hohmann transfers, and design delta-v maneuver sequences under realistic n-body gravity.</p>
+          <span class="card-link">Launch App &rarr;</span>
+        </a>
+
+        <a href="https://puffymist.github.io/space_mission_planner/docs/" class="card">
+          <h3>Documentation</h3>
+          <p>User guide and orbital mechanics concepts. Learn how to plan transfers, use reference frames, and understand the physics behind the simulation.</p>
+          <span class="card-link">Read Docs &rarr;</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="features">
+      <h2>What It Does</h2>
+      <div class="card-grid features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">&#x2609;</div>
+          <h3>N-Body Simulation</h3>
+          <p>16 celestial bodies with full gravitational interaction. Adaptive Velocity Verlet integration for accurate trajectories.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#x21C4;</div>
+          <h3>Transfer Calculator</h3>
+          <p>Hohmann and bi-elliptic transfer computation with automatic launch window search and one-click application.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#x0394;</div>
+          <h3>Maneuver Planning</h3>
+          <p>Design burns in heliocentric, velocity-relative, or body-relative frames with live trajectory preview.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#x21BB;</div>
+          <h3>Reference Frames</h3>
+          <p>Switch between inertial and rotating views to see trajectories from different perspectives.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <a href="https://github.com/puffymist" class="footer-link">GitHub</a>
+    <span class="footer-sep">&middot;</span>
+    <a href="https://github.com/puffymist/space_mission_planner" class="footer-link">Source Code</a>
+  </footer>
+</body>
+</html>
