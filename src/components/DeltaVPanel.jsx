@@ -10,6 +10,23 @@ import { formatEpochMedium, formatVelocity, formatDistance } from '../utils/time
 import { j2000ToDate, dateToJ2000 } from '../constants/physics.js';
 import BODIES, { BODY_MAP } from '../constants/bodies.js';
 
+// Group color palette for epoch-linked groups
+const GROUP_COLORS = ['#8af', '#fa8', '#8fa', '#f8a', '#a8f'];
+
+function getGroupColors(craft) {
+  const groups = new Map();
+  if (craft.launchLinkedGroup) groups.set(craft.launchLinkedGroup, null);
+  for (const ev of craft.events) {
+    if (ev.linkedGroup && !groups.has(ev.linkedGroup)) groups.set(ev.linkedGroup, null);
+  }
+  let i = 0;
+  for (const key of groups.keys()) {
+    groups.set(key, GROUP_COLORS[i % GROUP_COLORS.length]);
+    i++;
+  }
+  return groups;
+}
+
 // --- Preview worker for non-blocking maneuver preview ---
 let previewWorker = null;
 
@@ -57,6 +74,7 @@ function ManeuverEditor({ craft, eventIndex, onDone }) {
   const removeDeltaV = useCraftStore((s) => s.removeDeltaV);
   const linkEvents = useCraftStore((s) => s.linkEvents);
   const unlinkEvent = useCraftStore((s) => s.unlinkEvent);
+  const joinGroup = useCraftStore((s) => s.joinGroup);
   const epoch = useSimStore((s) => s.epoch);
 
   // Restore from spec if available, else reverse-engineer
@@ -71,6 +89,7 @@ function ManeuverEditor({ craft, eventIndex, onDone }) {
   const [refBody, setRefBody] = useState(initRefBody);
   const [editEpoch, setEditEpoch] = useState(ev.epoch);
   const [dvStep, setDvStep] = useState(100);
+  const [linkTarget, setLinkTarget] = useState('launch');
   const debounceRef = useRef(null);
 
   // Live preview
@@ -196,10 +215,33 @@ function ManeuverEditor({ craft, eventIndex, onDone }) {
             <button onClick={() => unlinkEvent(craft.id, eventIndex)} style={styles.unlinkBtn}>Unlink</button>
           </span>
         ) : (
-          <button onClick={() => {
-            // Link this event with launch
-            linkEvents(craft.id, [eventIndex], true);
-          }} style={styles.linkBtn}>Link to launch</button>
+          <div style={{ display: 'flex', gap: 3, flex: 1 }}>
+            <select value={linkTarget} onChange={(e) => setLinkTarget(e.target.value)}
+              style={{ ...styles.select, flex: 1 }}>
+              <option value="launch">Launch</option>
+              {craft.events.map((_, i) => i !== eventIndex && (
+                <option key={i} value={`ev-${i}`}>#{i + 1}</option>
+              ))}
+            </select>
+            <button onClick={() => {
+              if (linkTarget === 'launch') {
+                const existing = craft.launchLinkedGroup;
+                if (existing) {
+                  joinGroup(craft.id, eventIndex, existing);
+                } else {
+                  linkEvents(craft.id, [eventIndex], true);
+                }
+              } else {
+                const targetIdx = parseInt(linkTarget.split('-')[1]);
+                const existing = craft.events[targetIdx]?.linkedGroup;
+                if (existing) {
+                  joinGroup(craft.id, eventIndex, existing);
+                } else {
+                  linkEvents(craft.id, [eventIndex, targetIdx], false);
+                }
+              }
+            }} style={styles.linkBtn}>Link</button>
+          </div>
         )}
       </div>
       <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
@@ -216,11 +258,13 @@ function LaunchEditor({ craft, onDone }) {
   const updateInitialState = useCraftStore((s) => s.updateInitialState);
   const linkEvents = useCraftStore((s) => s.linkEvents);
   const unlinkLaunch = useCraftStore((s) => s.unlinkLaunch);
+  const joinLaunchToGroup = useCraftStore((s) => s.joinLaunchToGroup);
 
   const hasLaunchSpec = craft.launchDirection && craft.originBodyId && craft.orbitAltitude;
 
   const [initManual, setInitManual] = useState(false);
   const [initEpoch, setInitEpoch] = useState(craft.launchEpoch);
+  const [linkTarget, setLinkTarget] = useState(craft.events.length > 0 ? 'ev-0' : '');
   const [initPhase, setInitPhase] = useState(craft.launchPhase || 0);
   const [initX, setInitX] = useState(craft.initialState.x / 1000);
   const [initY, setInitY] = useState(craft.initialState.y / 1000);
@@ -286,15 +330,32 @@ function LaunchEditor({ craft, onDone }) {
             Group ({linkedCount})
             <button onClick={() => unlinkLaunch(craft.id)} style={styles.unlinkBtn}>Unlink</button>
           </span>
-        ) : (
-          craft.events.length > 0 ? (
+        ) : craft.events.length > 0 ? (
+          <div style={{ display: 'flex', gap: 3, flex: 1 }}>
+            <select value={linkTarget} onChange={(e) => setLinkTarget(e.target.value)}
+              style={{ ...styles.select, flex: 1 }}>
+              {craft.events.map((_, i) => (
+                <option key={i} value={`ev-${i}`}>#{i + 1}</option>
+              ))}
+              <option value="all">All</option>
+            </select>
             <button onClick={() => {
-              const allIndices = craft.events.map((_, i) => i);
-              linkEvents(craft.id, allIndices, true);
-            }} style={styles.linkBtn}>Link all</button>
-          ) : (
-            <span style={styles.unitLabel}>No maneuvers</span>
-          )
+              if (linkTarget === 'all') {
+                const allIndices = craft.events.map((_, i) => i);
+                linkEvents(craft.id, allIndices, true);
+              } else {
+                const targetIdx = parseInt(linkTarget.split('-')[1]);
+                const existing = craft.events[targetIdx]?.linkedGroup;
+                if (existing) {
+                  joinLaunchToGroup(craft.id, existing);
+                } else {
+                  linkEvents(craft.id, [targetIdx], true);
+                }
+              }
+            }} style={styles.linkBtn}>Link</button>
+          </div>
+        ) : (
+          <span style={styles.unitLabel}>No maneuvers</span>
         )}
       </div>
       <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
@@ -357,6 +418,8 @@ export default function DeltaVPanel() {
     addDeltaV(craft.id, epoch, dv.dvx, dv.dvy);
   };
 
+  const groupColors = getGroupColors(craft);
+
   return (
     <div style={styles.panel}>
       <div style={styles.header}>Delta-V Maneuvers</div>
@@ -364,22 +427,31 @@ export default function DeltaVPanel() {
       {/* Event list */}
       <div style={styles.eventList}>
         {/* #0 Launch */}
-        <div
-          style={{ ...styles.eventRow, ...(expandedIndex === 0 ? styles.eventRowActive : {}) }}
-          onClick={() => setExpandedIndex(expandedIndex === 0 ? null : 0)}
-        >
-          <span style={styles.eventIdx}>#0</span>
-          <div style={styles.eventInfo}>
-            <span style={styles.eventLabel}>Launch</span>
-            <span style={styles.eventDetail}>{formatEpochMedium(craft.launchEpoch)}</span>
-            <span style={styles.eventDetail}>
-              {BODY_MAP[craft.originBodyId]?.name || craft.originBodyId}
-              {craft.orbitAltitude ? ` · ${formatDistance(craft.orbitAltitude)}` : ''}
-              {craft.launchPhase ? ` · ${craft.launchPhase}°` : ''}
-            </span>
-          </div>
-          {craft.launchLinkedGroup && <span style={styles.linkDot} title="Epoch-linked" />}
-        </div>
+        {(() => {
+          const launchColor = craft.launchLinkedGroup ? groupColors.get(craft.launchLinkedGroup) : null;
+          return (
+            <div
+              style={{
+                ...styles.eventRow,
+                ...(expandedIndex === 0 ? styles.eventRowActive : {}),
+                ...(launchColor ? { borderLeftColor: launchColor } : {}),
+              }}
+              onClick={() => setExpandedIndex(expandedIndex === 0 ? null : 0)}
+            >
+              <span style={styles.eventIdx}>#0</span>
+              <div style={styles.eventInfo}>
+                <span style={styles.eventLabel}>Launch</span>
+                <span style={styles.eventDetail}>{formatEpochMedium(craft.launchEpoch)}</span>
+                <span style={styles.eventDetail}>
+                  {BODY_MAP[craft.originBodyId]?.name || craft.originBodyId}
+                  {craft.orbitAltitude ? ` · ${formatDistance(craft.orbitAltitude)}` : ''}
+                  {craft.launchPhase ? ` · ${craft.launchPhase}°` : ''}
+                </span>
+              </div>
+              {launchColor && <span style={{ ...styles.linkDot, background: launchColor }} title="Epoch-linked" />}
+            </div>
+          );
+        })()}
         {expandedIndex === 0 && (
           <LaunchEditor craft={craft} onDone={() => setExpandedIndex(null)} />
         )}
@@ -389,10 +461,15 @@ export default function DeltaVPanel() {
           const dvMag = Math.sqrt(ev.dvx * ev.dvx + ev.dvy * ev.dvy);
           const idx = i + 1; // 1-indexed in expandedIndex
           const isExpanded = expandedIndex === idx;
+          const evColor = ev.linkedGroup ? groupColors.get(ev.linkedGroup) : null;
           return (
             <div key={i}>
               <div
-                style={{ ...styles.eventRow, ...(isExpanded ? styles.eventRowActive : {}) }}
+                style={{
+                  ...styles.eventRow,
+                  ...(isExpanded ? styles.eventRowActive : {}),
+                  ...(evColor && !isExpanded ? { borderLeftColor: evColor } : {}),
+                }}
                 onClick={() => setExpandedIndex(isExpanded ? null : idx)}
               >
                 <span style={styles.eventIdx}>#{idx}</span>
@@ -406,7 +483,7 @@ export default function DeltaVPanel() {
                   )}
                 </div>
                 <span style={styles.eventDv}>{formatVelocity(dvMag)}</span>
-                {ev.linkedGroup && <span style={styles.linkDot} title="Epoch-linked" />}
+                {evColor && <span style={{ ...styles.linkDot, background: evColor }} title="Epoch-linked" />}
               </div>
               {isExpanded && (
                 <ManeuverEditor

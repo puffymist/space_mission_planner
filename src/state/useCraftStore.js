@@ -3,12 +3,24 @@ import { getBodyPosition, getBodyVelocity, getAllBodyPositions } from '../physic
 import { BODY_MAP } from '../constants/bodies.js';
 import { sub, normalize, scale, add, rotate } from '../utils/vector.js';
 import { nearestBody } from '../physics/gravity.js';
+import { interpolateState } from '../utils/interpolate.js';
+import { computeDeltaV } from '../physics/deltaV.js';
 
 let nextId = 1;
 let nextLinkGroup = 1;
 
 const CRAFT_COLORS = ['#00ff88', '#ff6644', '#44aaff', '#ffaa00', '#ff44ff', '#44ffff'];
 const G = 6.6743e-11;
+
+// Recompute a linked event's dvx/dvy from its spec at the new epoch
+function recomputeLinkedEvent(ev, deltaT, segments) {
+  const newEpoch = ev.epoch + deltaT;
+  if (!ev.spec) return { ...ev, epoch: newEpoch };
+  const craftState = interpolateState(segments, newEpoch);
+  if (!craftState) return { ...ev, epoch: newEpoch };
+  const dv = computeDeltaV(ev.spec.frame, ev.spec.angle, ev.spec.magnitude, craftState, ev.spec.refBody, newEpoch);
+  return { ...ev, epoch: newEpoch, dvx: dv.dvx, dvy: dv.dvy };
+}
 const FULL_DURATION = 100 * 365.25 * 86400; // 100 years for background worker
 
 // --- Web Worker lifecycle ---
@@ -236,8 +248,7 @@ const useCraftStore = create((set, get) => ({
             if (i === eventIndex) {
               return { ...ev, ...updates };
             }
-            // Shift linked event and recompute its dvx/dvy from spec if available
-            return { ...ev, epoch: ev.epoch + deltaT };
+            return recomputeLinkedEvent(ev, deltaT, c.segments);
           }
           return ev;
         });
@@ -318,7 +329,7 @@ const useCraftStore = create((set, get) => ({
           const deltaT = newCraft.launchEpoch - c.launchEpoch;
           newCraft.events = newCraft.events.map(ev => {
             if (ev.linkedGroup === newCraft.launchLinkedGroup) {
-              return { ...ev, epoch: ev.epoch + deltaT };
+              return recomputeLinkedEvent(ev, deltaT, c.segments);
             }
             return ev;
           });
@@ -365,6 +376,24 @@ const useCraftStore = create((set, get) => ({
       const { launchLinkedGroup, ...rest } = c;
       return rest;
     });
+    return { crafts };
+  }),
+
+  joinGroup: (craftId, eventIndex, groupId) => set((state) => {
+    const crafts = state.crafts.map((c) => {
+      if (c.id !== craftId) return c;
+      const events = c.events.map((ev, i) =>
+        i === eventIndex ? { ...ev, linkedGroup: groupId } : ev
+      );
+      return { ...c, events };
+    });
+    return { crafts };
+  }),
+
+  joinLaunchToGroup: (craftId, groupId) => set((state) => {
+    const crafts = state.crafts.map((c) =>
+      c.id === craftId ? { ...c, launchLinkedGroup: groupId } : c
+    );
     return { crafts };
   }),
 
