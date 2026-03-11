@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import useCraftStore from '../state/useCraftStore.js';
 import useSimStore from '../state/useSimStore.js';
 import { exportMission, importMission } from '../utils/exportFormat.js';
-import { computeTrajectory } from '../physics/trajectory.js';
+
 
 export default function ImportExport() {
   const fileInputRef = useRef(null);
@@ -57,9 +57,8 @@ export default function ImportExport() {
               ...(e.spec ? { spec: e.spec } : {}),
               ...(e.linkedGroup ? { linkedGroup: e.linkedGroup } : {}),
             })),
-            segments: null,
+            segments: [],
           };
-          craft.segments = computeTrajectory(craft);
           return craft;
         });
 
@@ -67,6 +66,7 @@ export default function ImportExport() {
           crafts: newCrafts,
           selectedCraftId: newCrafts.length > 0 ? newCrafts[0].id : null,
         });
+        useCraftStore.getState().recomputeAll();
       } catch (err) {
         alert('Import failed: ' + err.message);
       }
