@@ -6,8 +6,7 @@ import { FRAMES, PRESETS, computeDeltaV, circularizeDeltaV } from '../physics/de
 import { interpolateState } from '../utils/interpolate.js';
 import { getBodyPosition, getAllBodyPositions } from '../physics/bodyPosition.js';
 import { nearestBody } from '../physics/gravity.js';
-import { formatEpochMedium, formatVelocity, formatDistance } from '../utils/time.js';
-import { j2000ToDate, dateToJ2000 } from '../constants/physics.js';
+import { formatEpochMedium, formatVelocity, formatDistance, toDatetimeLocal, fromDatetimeLocal } from '../utils/time.js';
 import BODIES, { BODY_MAP } from '../constants/bodies.js';
 
 // Group color palette for epoch-linked groups
@@ -57,15 +56,46 @@ function computePreviewAsync(tempCraft, duration, callback) {
   });
 }
 
-// Guarded datetime helpers
-const toDatetimeLocal = (t) => {
-  const d = j2000ToDate(t);
-  return isNaN(d.getTime()) ? '2000-01-01T12:00:00' : d.toISOString().slice(0, 19);
-};
-const fromDatetimeLocal = (val) => {
-  const d = new Date(val + 'Z');
-  return isNaN(d.getTime()) ? null : dateToJ2000(d);
-};
+// ------- Numeric input that tolerates intermediate states ("-", "-0.", etc.) -------
+function NumericInput({ value, onChange, style, step, ...rest }) {
+  const [text, setText] = useState(String(value));
+  const prevValue = useRef(value);
+
+  // Sync from external changes (slider, presets, etc.)
+  useEffect(() => {
+    if (value !== prevValue.current) {
+      setText(String(value));
+      prevValue.current = value;
+    }
+  }, [value]);
+
+  const handleChange = (e) => {
+    const raw = e.target.value;
+    setText(raw);
+    const n = Number(raw);
+    if (raw.trim() !== '' && isFinite(n)) {
+      prevValue.current = n;
+      onChange(n);
+    }
+  };
+
+  const handleBlur = () => {
+    // Normalize display to current numeric value
+    setText(String(value));
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={text}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      style={style}
+      {...rest}
+    />
+  );
+}
 
 // ------- Maneuver inline editor -------
 function ManeuverEditor({ craft, eventIndex, onDone }) {
@@ -177,8 +207,8 @@ function ManeuverEditor({ craft, eventIndex, onDone }) {
       )}
       <div style={styles.editRow}>
         <span style={styles.editLabel}>Angle:</span>
-        <input type="number" value={angle} step={1}
-          onChange={(e) => setAngle(Number(e.target.value))} style={styles.angleInput} />
+        <NumericInput value={angle}
+          onChange={(n) => setAngle(n)} style={styles.angleInput} />
         <span style={styles.unitLabel}>°</span>
       </div>
       <div style={styles.presetRow}>
@@ -191,8 +221,8 @@ function ManeuverEditor({ craft, eventIndex, onDone }) {
       </div>
       <div style={styles.editRow}>
         <span style={styles.editLabel}>Mag:</span>
-        <input type="number" value={Math.round(magnitude * 10) / 10}
-          onChange={(e) => setMagnitude(Math.max(0, Number(e.target.value)))} style={styles.magInput} />
+        <NumericInput value={Math.round(magnitude * 10) / 10}
+          onChange={(n) => setMagnitude(Math.max(0, n))} style={styles.magInput} />
         <span style={styles.unitLabel}>m/s</span>
       </div>
       <input type="range" min={0} max={maxMag} step={dvStep}
@@ -304,8 +334,8 @@ function LaunchEditor({ craft, onDone }) {
           </div>
           <div style={styles.editRow}>
             <span style={styles.editLabel}>Phase:</span>
-            <input type="number" value={initPhase} step={10}
-              onChange={(e) => setInitPhase(Number(e.target.value))} style={styles.angleInput} />
+            <NumericInput value={initPhase}
+              onChange={(n) => setInitPhase(n)} style={styles.angleInput} />
             <span style={styles.unitLabel}>° CCW</span>
           </div>
           <div style={styles.manualLink} onClick={() => setInitManual(true)}>Edit state manually</div>
@@ -316,8 +346,8 @@ function LaunchEditor({ craft, onDone }) {
             ['Vx (m/s)', initVx, setInitVx], ['Vy (m/s)', initVy, setInitVy]].map(([label, val, setter]) => (
             <div key={label} style={styles.editRow}>
               <span style={styles.editLabel}>{label}:</span>
-              <input type="number" value={Math.round(val * 10) / 10}
-                onChange={(e) => setter(Number(e.target.value))} style={styles.stateInput} />
+              <NumericInput value={Math.round(val * 10) / 10}
+                onChange={(n) => setter(n)} style={styles.stateInput} />
             </div>
           ))}
         </>
@@ -436,7 +466,11 @@ export default function DeltaVPanel() {
                 ...(expandedIndex === 0 ? styles.eventRowActive : {}),
                 ...(launchColor ? { borderLeftColor: launchColor } : {}),
               }}
-              onClick={() => setExpandedIndex(expandedIndex === 0 ? null : 0)}
+              onClick={() => {
+                const expanding = expandedIndex !== 0;
+                setExpandedIndex(expanding ? 0 : null);
+                if (expanding) useSimStore.getState().setEpoch(craft.launchEpoch);
+              }}
             >
               <span style={styles.eventIdx}>#0</span>
               <div style={styles.eventInfo}>
@@ -470,7 +504,11 @@ export default function DeltaVPanel() {
                   ...(isExpanded ? styles.eventRowActive : {}),
                   ...(evColor && !isExpanded ? { borderLeftColor: evColor } : {}),
                 }}
-                onClick={() => setExpandedIndex(isExpanded ? null : idx)}
+                onClick={() => {
+                  const expanding = !isExpanded;
+                  setExpandedIndex(expanding ? idx : null);
+                  if (expanding) useSimStore.getState().setEpoch(ev.epoch);
+                }}
               >
                 <span style={styles.eventIdx}>#{idx}</span>
                 <div style={styles.eventInfo}>
