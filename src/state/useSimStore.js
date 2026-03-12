@@ -9,12 +9,22 @@ const useSimStore = create((set) => ({
   speed: 86400, // default: 1 day per second
   // Epoch step for slider (synced with speed)
   epochStep: 86400,
+  // Epoch bookmarks: static saved epochs for quick-jumping
+  bookmarks: [], // array of { epoch: number }
 
   setEpoch: (epoch) => set({ epoch }),
   togglePlay: () => set((s) => ({ playing: !s.playing })),
   setPlaying: (playing) => set({ playing }),
   setSpeed: (speed) => set({ speed, epochStep: Math.abs(speed) }),
   setEpochStep: (step) => set({ epochStep: step, speed: step }),
+  setBookmarks: (bookmarks) => set({ bookmarks }),
+  addBookmark: () => set((s) => ({ bookmarks: [...s.bookmarks, { epoch: s.epoch }] })),
+  updateBookmark: (index, epoch) => set((s) => ({
+    bookmarks: s.bookmarks.map((b, i) => i === index ? { ...b, epoch } : b),
+  })),
+  removeBookmark: (index) => set((s) => ({
+    bookmarks: s.bookmarks.filter((_, i) => i !== index),
+  })),
 }));
 
 export default useSimStore;

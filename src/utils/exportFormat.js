@@ -1,12 +1,13 @@
 // Export/import spacecraft missions as JSON
 // Only stores initial state + delta-v events (trajectories are recomputed on import)
 
-const FORMAT_VERSION = 2;
+const FORMAT_VERSION = 3;
 
-export function exportMission(crafts, epoch) {
+export function exportMission(crafts, epoch, bookmarks) {
   return JSON.stringify({
     version: FORMAT_VERSION,
     epoch,
+    bookmarks: bookmarks || [],
     crafts: crafts.map(c => ({
       name: c.name,
       color: c.color,

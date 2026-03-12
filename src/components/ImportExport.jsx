@@ -9,8 +9,8 @@ export default function ImportExport() {
 
   const handleExport = () => {
     const crafts = useCraftStore.getState().crafts;
-    const epoch = useSimStore.getState().epoch;
-    const json = exportMission(crafts, epoch);
+    const { epoch, bookmarks } = useSimStore.getState();
+    const json = exportMission(crafts, epoch, bookmarks);
 
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -34,10 +34,11 @@ export default function ImportExport() {
       try {
         const data = importMission(ev.target.result);
 
-        // Set epoch
+        // Set epoch and bookmarks
         if (data.epoch !== undefined) {
           useSimStore.setState({ epoch: data.epoch });
         }
+        useSimStore.setState({ bookmarks: data.bookmarks || [] });
 
         // Reconstruct crafts with computed trajectories
         const newCrafts = data.crafts.map((c, i) => {
