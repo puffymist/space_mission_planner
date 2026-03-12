@@ -97,7 +97,7 @@ const BODIES = [
     mass: 7.346e22,
     parent: 'earth',
     orbitalRadius: 3.844e8,
-    orbitalPeriod: 27.322 * 86400,
+    orbitalPeriod: 27.321661 * 86400,
     initialAngle: 223.32 * DEG,
   },
 
@@ -108,7 +108,7 @@ const BODIES = [
     mass: 8.932e22,
     parent: 'jupiter',
     orbitalRadius: 4.217e8,
-    orbitalPeriod: 1.769 * 86400,
+    orbitalPeriod: 1.769137786 * 86400,
     initialAngle: 17.92 * DEG,
   },
   {
@@ -117,7 +117,7 @@ const BODIES = [
     mass: 4.800e22,
     parent: 'jupiter',
     orbitalRadius: 6.711e8,
-    orbitalPeriod: 3.551 * 86400,
+    orbitalPeriod: 3.551181041 * 86400,
     initialAngle: 212.39 * DEG,
   },
   {
@@ -126,7 +126,7 @@ const BODIES = [
     mass: 1.482e23,
     parent: 'jupiter',
     orbitalRadius: 1.070e9,
-    orbitalPeriod: 7.155 * 86400,
+    orbitalPeriod: 7.15455296 * 86400,
     initialAngle: 219.84 * DEG,
   },
   {
@@ -135,7 +135,7 @@ const BODIES = [
     mass: 1.076e23,
     parent: 'jupiter',
     orbitalRadius: 1.883e9,
-    orbitalPeriod: 16.69 * 86400,
+    orbitalPeriod: 16.6890184 * 86400,
     initialAngle: 80.05 * DEG,
   },
 
@@ -146,7 +146,7 @@ const BODIES = [
     mass: 1.345e23,
     parent: 'saturn',
     orbitalRadius: 1.222e9,
-    orbitalPeriod: 15.945 * 86400,
+    orbitalPeriod: 15.945421 * 86400,
     initialAngle: 141.00 * DEG,
   },
 
