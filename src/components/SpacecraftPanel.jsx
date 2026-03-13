@@ -73,7 +73,7 @@ export default function SpacecraftPanel() {
               onClick={(e) => { e.stopPropagation(); removeCraft(c.id); }}
               style={styles.deleteBtn}
             >
-              x
+              ×
             </button>
           </div>
         ))}
@@ -185,8 +185,8 @@ const styles = {
     flex: 1,
   },
   deleteBtn: {
-    background: 'rgba(255,50,50,0.2)',
-    border: '1px solid rgba(255,50,50,0.3)',
+    background: 'rgba(200,50,50,0.2)',
+    border: '1px solid rgba(200,50,50,0.3)',
     color: '#f66',
     borderRadius: 3,
     padding: '0 5px',

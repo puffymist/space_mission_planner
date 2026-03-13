@@ -123,7 +123,7 @@ export default function CameraHelper() {
 const styles = {
   panel: {
     position: 'absolute',
-    top: 44,
+    top: 64,
     left: 8,
     width: 180,
     background: 'rgba(10, 10, 30, 0.9)',
@@ -153,7 +153,7 @@ const styles = {
     color: '#fff',
     borderRadius: 3,
     padding: '2px 4px',
-    fontSize: 11,
+    fontSize: 12,
   },
   goBtn: {
     background: 'rgba(100,150,255,0.2)',
@@ -161,7 +161,7 @@ const styles = {
     color: '#8af',
     borderRadius: 3,
     padding: '2px 8px',
-    fontSize: 11,
+    fontSize: 12,
     cursor: 'pointer',
   },
   presets: {

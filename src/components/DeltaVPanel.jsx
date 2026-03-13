@@ -114,8 +114,8 @@ function ManeuverEditor({ craft, eventIndex, onDone }) {
   const initRefBody = ev.spec?.refBody || 'earth';
 
   const [frame, setFrame] = useState(initFrame);
-  const [angle, setAngle] = useState(Math.round(initAngle * 100) / 100);
-  const [magnitude, setMagnitude] = useState(Math.round(initMag * 10) / 10);
+  const [angle, setAngle] = useState(initAngle);
+  const [magnitude, setMagnitude] = useState(initMag);
   const [refBody, setRefBody] = useState(initRefBody);
   const [editEpoch, setEditEpoch] = useState(ev.epoch);
   const [dvStep, setDvStep] = useState(100);
@@ -223,7 +223,7 @@ function ManeuverEditor({ craft, eventIndex, onDone }) {
       </div>
       <div style={styles.editRow}>
         <span style={styles.editLabel}>Mag:</span>
-        <NumericInput value={Math.round(magnitude * 10) / 10}
+        <NumericInput value={magnitude}
           onChange={(n) => setMagnitude(Math.max(0, n))} style={styles.magInput} />
         <span style={styles.unitLabel}>m/s</span>
       </div>
@@ -350,7 +350,7 @@ function LaunchEditor({ craft, onDone }) {
             ['Vx (m/s)', initVx, setInitVx], ['Vy (m/s)', initVy, setInitVy]].map(([label, val, setter]) => (
             <div key={label} style={styles.editRow}>
               <span style={styles.editLabel}>{label}:</span>
-              <NumericInput value={Math.round(val * 10) / 10}
+              <NumericInput value={val}
                 onChange={(n) => setter(n)} style={styles.stateInput} />
             </div>
           ))}
@@ -456,7 +456,7 @@ export default function DeltaVPanel() {
 
   return (
     <div style={styles.panel}>
-      <div style={styles.header}>Delta-V Maneuvers</div>
+      <div style={styles.header}>Maneuvers</div>
 
       {/* Event list */}
       <div style={styles.eventList}>
@@ -545,7 +545,7 @@ export default function DeltaVPanel() {
 
 const styles = {
   panel: {
-    width: 240,
+    width: 260,
     background: 'rgba(10, 10, 30, 0.9)',
     border: '1px solid rgba(255,255,255,0.1)',
     borderRadius: 6,
@@ -639,7 +639,7 @@ const styles = {
   editLabel: {
     fontSize: 9,
     color: '#888',
-    minWidth: 36,
+    minWidth: 30,
   },
   epochInput: {
     background: 'rgba(255,255,255,0.1)',
