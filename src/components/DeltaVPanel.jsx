@@ -188,8 +188,10 @@ function ManeuverEditor({ craft, eventIndex, onDone }) {
         <span style={styles.editLabel}>Epoch:</span>
         <input type="datetime-local" value={toDatetimeLocal(editEpoch)} step="1"
           style={styles.epochInput}
-          onChange={(e) => { const t = fromDatetimeLocal(e.target.value); if (t !== null) { setEditEpoch(t); useSimStore.getState().setEpoch(t); } }}
+          onChange={(e) => { const t = fromDatetimeLocal(e.target.value); if (t !== null) setEditEpoch(t); }}
         />
+        <button onClick={() => useSimStore.getState().setEpoch(editEpoch)}
+          style={styles.goBtn} title="Jump to this epoch">Go</button>
       </div>
       <div style={styles.editRow}>
         <span style={styles.editLabel}>Frame:</span>
@@ -326,6 +328,8 @@ function LaunchEditor({ craft, onDone }) {
           style={styles.epochInput}
           onChange={(e) => { const t = fromDatetimeLocal(e.target.value); if (t !== null) setInitEpoch(t); }}
         />
+        <button onClick={() => useSimStore.getState().setEpoch(initEpoch)}
+          style={styles.goBtn} title="Jump to this epoch">Go</button>
       </div>
       {hasLaunchSpec && !initManual ? (
         <>
@@ -466,11 +470,7 @@ export default function DeltaVPanel() {
                 ...(expandedIndex === 0 ? styles.eventRowActive : {}),
                 ...(launchColor ? { borderLeftColor: launchColor } : {}),
               }}
-              onClick={() => {
-                const expanding = expandedIndex !== 0;
-                setExpandedIndex(expanding ? 0 : null);
-                if (expanding) useSimStore.getState().setEpoch(craft.launchEpoch);
-              }}
+              onClick={() => setExpandedIndex(expandedIndex === 0 ? null : 0)}
             >
               <span style={styles.eventIdx}>#0</span>
               <div style={styles.eventInfo}>
@@ -504,11 +504,7 @@ export default function DeltaVPanel() {
                   ...(isExpanded ? styles.eventRowActive : {}),
                   ...(evColor && !isExpanded ? { borderLeftColor: evColor } : {}),
                 }}
-                onClick={() => {
-                  const expanding = !isExpanded;
-                  setExpandedIndex(expanding ? idx : null);
-                  if (expanding) useSimStore.getState().setEpoch(ev.epoch);
-                }}
+                onClick={() => setExpandedIndex(isExpanded ? null : idx)}
               >
                 <span style={styles.eventIdx}>#{idx}</span>
                 <div style={styles.eventInfo}>
@@ -655,6 +651,17 @@ const styles = {
     fontFamily: 'monospace',
     flex: 1,
     minWidth: 0,
+  },
+  goBtn: {
+    background: 'rgba(100,150,255,0.2)',
+    border: '1px solid rgba(100,150,255,0.4)',
+    color: '#8af',
+    borderRadius: 3,
+    padding: '2px 5px',
+    fontSize: 9,
+    cursor: 'pointer',
+    fontWeight: 600,
+    flexShrink: 0,
   },
   select: {
     background: 'rgba(255,255,255,0.1)',
