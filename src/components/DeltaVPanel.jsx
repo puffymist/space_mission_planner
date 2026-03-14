@@ -199,7 +199,7 @@ function ManeuverEditor({ craft, eventIndex, onDone }) {
           {FRAMES.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
         </select>
       </div>
-      {frame === 'body' && (
+      {(frame === 'body' || frame === 'velocity') && (
         <div style={styles.editRow}>
           <span style={styles.editLabel}>Ref:</span>
           <select value={refBody} onChange={(e) => setRefBody(e.target.value)} style={styles.select}>
@@ -511,8 +511,8 @@ export default function DeltaVPanel() {
                   <span style={styles.eventDetail}>{formatEpochMedium(ev.epoch)}</span>
                   {ev.spec && (
                     <span style={styles.eventDetail}>
-                      {ev.spec.frame === 'body' ? `${BODY_MAP[ev.spec.refBody]?.name || ev.spec.refBody} ` : ''}
-                      {ev.spec.frame} {ev.spec.angle}°
+                      {ev.spec.frame === 'body' || ev.spec.frame === 'velocity' ? `${BODY_MAP[ev.spec.refBody]?.name || ev.spec.refBody || 'Sun'} ` : ''}
+                      {FRAMES.find(f => f.id === ev.spec.frame)?.label || ev.spec.frame} {ev.spec.angle}°
                     </span>
                   )}
                 </div>

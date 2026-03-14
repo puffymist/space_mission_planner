@@ -18,7 +18,7 @@ Direction is specified relative to the fixed solar system axes (+X, +Y). This is
 Best for: specifying precise interplanetary trajectory corrections.
 
 ### Velocity-Relative
-Direction is specified relative to the spacecraft's current velocity:
+Direction is specified relative to the spacecraft's current velocity relative to a chosen celestian body:
 
 | Direction | Angle | Effect |
 |-----------|-------|--------|

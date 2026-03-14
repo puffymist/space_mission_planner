@@ -39,8 +39,8 @@ export const PRESETS = {
  * @param {number} angleDeg - angle in degrees within the frame
  * @param {number} magnitude - delta-V magnitude in m/s
  * @param {object} craftState - {x, y, vx, vy} spacecraft state at maneuver epoch
- * @param {string} [refBodyId] - reference body id (for 'body' frame)
- * @param {number} [epoch] - epoch for body position lookup (for 'body' frame)
+ * @param {string} [refBodyId] - reference body id (for 'velocity' and 'body' frames)
+ * @param {number} [epoch] - epoch for body position/velocity lookup (for 'velocity' and 'body' frames)
  * @returns {{dvx: number, dvy: number}}
  */
 export function computeDeltaV(frame, angleDeg, magnitude, craftState, refBodyId, epoch) {
@@ -53,8 +53,15 @@ export function computeDeltaV(frame, angleDeg, magnitude, craftState, refBodyId,
       break;
     }
     case 'velocity': {
-      // 0°=prograde (along velocity), 90°=normal (CCW from velocity)
-      const vel = normalize({ x: craftState.vx, y: craftState.vy });
+      // 0°=forward (along velocity), 90°=left (CCW from velocity)
+      // If refBodyId provided, use velocity relative to that body
+      let velX = craftState.vx, velY = craftState.vy;
+      if (refBodyId) {
+        const bodyVel = getBodyVelocity(refBodyId, epoch);
+        velX -= bodyVel.x;
+        velY -= bodyVel.y;
+      }
+      const vel = normalize({ x: velX, y: velY });
       dir = rotate(vel, rad);
       break;
     }
