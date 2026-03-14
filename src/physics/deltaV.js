@@ -8,6 +8,7 @@ export const FRAMES = [
   { id: 'inertial', label: 'Inertial' },
   { id: 'velocity', label: 'Velocity' },
   { id: 'body', label: 'Body' },
+  { id: 'circularize', label: 'Circularize' },
 ];
 
 // Preset angles for quick selection per frame
@@ -35,12 +36,12 @@ export const PRESETS = {
 /**
  * Compute delta-V vector given frame, angle, magnitude, and context.
  *
- * @param {string} frame - 'inertial', 'velocity', or 'body'
- * @param {number} angleDeg - angle in degrees within the frame
- * @param {number} magnitude - delta-V magnitude in m/s
+ * @param {string} frame - 'inertial', 'velocity', 'body', or 'circularize'
+ * @param {number} angleDeg - angle in degrees within the frame (ignored for 'circularize')
+ * @param {number} magnitude - delta-V magnitude in m/s (ignored for 'circularize')
  * @param {object} craftState - {x, y, vx, vy} spacecraft state at maneuver epoch
- * @param {string} [refBodyId] - reference body id (for 'velocity' and 'body' frames)
- * @param {number} [epoch] - epoch for body position/velocity lookup (for 'velocity' and 'body' frames)
+ * @param {string} [refBodyId] - reference body id (for 'velocity', 'body', and 'circularize' frames)
+ * @param {number} [epoch] - epoch for body position/velocity lookup (for 'velocity', 'body', and 'circularize' frames)
  * @returns {{dvx: number, dvy: number}}
  */
 export function computeDeltaV(frame, angleDeg, magnitude, craftState, refBodyId, epoch) {
@@ -73,6 +74,9 @@ export function computeDeltaV(frame, angleDeg, magnitude, craftState, refBodyId,
       dir = rotate(prograde, rad);
       break;
     }
+    case 'circularize':
+      // angleDeg encodes orbit sense: 0=auto, 1=prograde(CCW), -1=retrograde(CW)
+      return circularizeDeltaV(craftState, refBodyId, epoch, angleDeg);
     default:
       dir = { x: Math.cos(rad), y: Math.sin(rad) };
   }
@@ -82,7 +86,8 @@ export function computeDeltaV(frame, angleDeg, magnitude, craftState, refBodyId,
 
 // Compute delta-v to circularize orbit around a body at the current distance
 // Returns {dvx, dvy} in inertial frame
-export function circularizeDeltaV(craftState, bodyId, epoch) {
+// sensePref: 0=auto (match current orbit sense), 1=prograde (CCW), -1=retrograde (CW)
+export function circularizeDeltaV(craftState, bodyId, epoch, sensePref = 0) {
   const body = BODY_MAP[bodyId];
   if (!body) return { dvx: 0, dvy: 0 };
 
@@ -99,9 +104,10 @@ export function circularizeDeltaV(craftState, bodyId, epoch) {
   // Circular orbit speed at this distance
   const vCirc = Math.sqrt(G * body.mass / r);
 
-  // Determine orbit sense from cross product of position and velocity
-  const sense = cross2d(relPos, relVel); // positive = CCW
-  const sign = sense >= 0 ? 1 : -1;
+  // Determine orbit sense
+  const sign = sensePref !== 0
+    ? sensePref  // forced: 1=CCW, -1=CW
+    : (cross2d(relPos, relVel) >= 0 ? 1 : -1);  // auto: match current orbit
 
   // Tangential direction (perpendicular to radial, matching orbit sense)
   const radDir = normalize(relPos);
