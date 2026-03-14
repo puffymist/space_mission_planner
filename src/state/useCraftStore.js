@@ -5,6 +5,7 @@ import { sub, normalize, scale, add, rotate } from '../utils/vector.js';
 import { nearestBody } from '../physics/gravity.js';
 import { interpolateState } from '../utils/interpolate.js';
 import { computeDeltaV } from '../physics/deltaV.js';
+import { integrateSegment } from '../physics/integrator.js';
 
 let nextId = 1;
 let nextLinkGroup = 1;
@@ -12,14 +13,55 @@ let nextLinkGroup = 1;
 const CRAFT_COLORS = ['#00ff88', '#ff6644', '#44aaff', '#ffaa00', '#ff44ff', '#44ffff'];
 const G = 6.6743e-11;
 
-// Recompute a linked event's dvx/dvy from its spec at the new epoch
-function recomputeLinkedEvent(ev, deltaT, segments) {
-  const newEpoch = ev.epoch + deltaT;
-  if (!ev.spec) return { ...ev, epoch: newEpoch };
-  const craftState = interpolateState(segments, newEpoch);
-  if (!craftState) return { ...ev, epoch: newEpoch };
-  const dv = computeDeltaV(ev.spec.frame, ev.spec.angle, ev.spec.magnitude, craftState, ev.spec.refBody, newEpoch);
-  return { ...ev, epoch: newEpoch, dvx: dv.dvx, dvy: dv.dvy };
+// Recompute linked events' dvx/dvy by forward-integrating from the NEW initial state.
+// This avoids using stale trajectory segments that don't reflect the updated launch.
+function recomputeLinkedEvents(events, linkedGroup, deltaT, initialState, launchEpoch, alreadyShiftedIndices = new Set()) {
+  // Shift linked event epochs (skip indices already at their new epoch)
+  const newEvents = events.map((ev, i) => {
+    if (ev.linkedGroup === linkedGroup && !alreadyShiftedIndices.has(i)) {
+      return { ...ev, epoch: ev.epoch + deltaT };
+    }
+    return ev;
+  });
+  newEvents.sort((a, b) => a.epoch - b.epoch);
+
+  // Find the last linked event epoch so we know when to stop integrating
+  let lastLinkedEpoch = -Infinity;
+  for (const ev of newEvents) {
+    if (ev.linkedGroup === linkedGroup) lastLinkedEpoch = ev.epoch;
+  }
+  if (lastLinkedEpoch < launchEpoch) return newEvents;
+
+  // Forward-integrate from new initial state, recomputing specs at each linked event
+  let { x, y, vx, vy } = initialState;
+  let t = launchEpoch;
+
+  for (let i = 0; i < newEvents.length; i++) {
+    const ev = newEvents[i];
+    if (ev.epoch < t) continue;
+    if (ev.epoch > lastLinkedEpoch) break;
+
+    // Propagate to this event's epoch
+    if (ev.epoch > t) {
+      const pts = integrateSegment(x, y, vx, vy, t, ev.epoch);
+      const last = pts[pts.length - 1];
+      x = last.x; y = last.y; vx = last.vx; vy = last.vy;
+      t = ev.epoch;
+    }
+
+    // Recompute dvx/dvy for linked events with a spec
+    if (ev.linkedGroup === linkedGroup && ev.spec) {
+      const craftState = { x, y, vx, vy };
+      const dv = computeDeltaV(ev.spec.frame, ev.spec.angle, ev.spec.magnitude, craftState, ev.spec.refBody, ev.epoch);
+      newEvents[i] = { ...ev, dvx: dv.dvx, dvy: dv.dvy };
+    }
+
+    // Apply this event's delta-v before continuing
+    vx += newEvents[i].dvx;
+    vy += newEvents[i].dvy;
+  }
+
+  return newEvents;
 }
 const FULL_DURATION = 100 * 365.25 * 86400; // 100 years for background worker
 
@@ -243,19 +285,13 @@ const useCraftStore = create((set, get) => ({
       if (updates.epoch !== undefined && oldEvent.linkedGroup) {
         const deltaT = updates.epoch - oldEvent.epoch;
         const newCraft = { ...c };
-        const newEvents = events.map((ev, i) => {
-          if (ev.linkedGroup === oldEvent.linkedGroup) {
-            if (i === eventIndex) {
-              return { ...ev, ...updates };
-            }
-            return recomputeLinkedEvent(ev, deltaT, c.segments);
-          }
-          return ev;
-        });
-        newEvents.sort((a, b) => a.epoch - b.epoch);
-        newCraft.events = newEvents;
 
-        // Also shift launch if linked to same group
+        // Apply updates to the edited event first
+        let newEvents = events.map((ev, i) =>
+          i === eventIndex ? { ...ev, ...updates } : ev
+        );
+
+        // Shift launch if linked to same group (need new initial state for propagation)
         if (newCraft.launchLinkedGroup === oldEvent.linkedGroup) {
           newCraft.launchEpoch += deltaT;
           const hasSpec = newCraft.originBodyId && newCraft.orbitAltitude && newCraft.launchDirection;
@@ -267,6 +303,13 @@ const useCraftStore = create((set, get) => ({
             if (newState) newCraft.initialState = newState;
           }
         }
+
+        // Recompute other linked events via forward integration from new initial state
+        newCraft.events = recomputeLinkedEvents(
+          newEvents, oldEvent.linkedGroup, deltaT,
+          newCraft.initialState, newCraft.launchEpoch,
+          new Set([eventIndex])
+        );
 
         computeAndExtend(newCraft, set);
         return newCraft;
@@ -327,13 +370,10 @@ const useCraftStore = create((set, get) => ({
         // Epoch-linking: cascade epoch change to linked events
         if (epochChanged && newCraft.launchLinkedGroup) {
           const deltaT = newCraft.launchEpoch - c.launchEpoch;
-          newCraft.events = newCraft.events.map(ev => {
-            if (ev.linkedGroup === newCraft.launchLinkedGroup) {
-              return recomputeLinkedEvent(ev, deltaT, c.segments);
-            }
-            return ev;
-          });
-          newCraft.events.sort((a, b) => a.epoch - b.epoch);
+          newCraft.events = recomputeLinkedEvents(
+            newCraft.events, newCraft.launchLinkedGroup, deltaT,
+            newCraft.initialState, newCraft.launchEpoch
+          );
         }
       }
       computeAndExtend(newCraft, set);
