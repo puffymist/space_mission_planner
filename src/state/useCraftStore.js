@@ -92,7 +92,7 @@ function startComputation(craft, set) {
       events: craft.events.map(e => ({ epoch: e.epoch, dvx: e.dvx, dvy: e.dvy })),
     },
     duration: FULL_DURATION,
-    firstChunkDuration: 90 * 86400, // 90 days for fast initial feedback
+    firstChunkDuration: 86400, // 24 hours for fast initial feedback
   });
 }
 
