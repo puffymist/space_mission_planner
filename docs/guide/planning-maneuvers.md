@@ -28,7 +28,7 @@ Choose how to specify the burn direction:
 
 | Frame | Directions | Best for |
 |-------|-----------|----------|
-| **Heliocentric** | Fixed +X, +Y, -X, -Y axes | Interplanetary transfers |
+| **Inertial** | Fixed +X, +Y, -X, -Y axes | Interplanetary transfers |
 | **Velocity** | Prograde, Normal, Retrograde, Anti-Normal | Orbit raising/lowering |
 | **Body** | Prograde, Radial+, Retrograde, Radial- relative to a chosen body | Local orbit adjustments |
 

@@ -5,7 +5,7 @@ import { getBodyPosition, getBodyVelocity } from './bodyPosition.js';
 
 // Reference frames for delta-V direction specification
 export const FRAMES = [
-  { id: 'helio', label: 'Heliocentric' },
+  { id: 'inertial', label: 'Inertial' },
   { id: 'velocity', label: 'Velocity' },
   { id: 'body', label: 'Body' },
 ];
@@ -13,18 +13,18 @@ export const FRAMES = [
 // Preset angles for quick selection per frame
 export const PRESETS = {
   velocity: [
-    { label: 'Pro', angle: 0 },
-    { label: 'Norm', angle: 90 },
-    { label: 'Retro', angle: 180 },
-    { label: 'A-Norm', angle: 270 },
+    { label: 'Forward', angle: 0 },
+    { label: 'Left', angle: 90 },
+    { label: 'Backward', angle: 180 },
+    { label: 'Right', angle: 270 },
   ],
   body: [
     { label: 'Pro', angle: 0 },
-    { label: 'Rad+', angle: 90 },
+    { label: 'Rad-', angle: 90 },
     { label: 'Retro', angle: 180 },
-    { label: 'Rad-', angle: 270 },
+    { label: 'Rad+', angle: 270 },
   ],
-  helio: [
+  inertial: [
     { label: '+X', angle: 0 },
     { label: '+Y', angle: 90 },
     { label: '-X', angle: 180 },
@@ -35,7 +35,7 @@ export const PRESETS = {
 /**
  * Compute delta-V vector given frame, angle, magnitude, and context.
  *
- * @param {string} frame - 'helio', 'velocity', or 'body'
+ * @param {string} frame - 'inertial', 'velocity', or 'body'
  * @param {number} angleDeg - angle in degrees within the frame
  * @param {number} magnitude - delta-V magnitude in m/s
  * @param {object} craftState - {x, y, vx, vy} spacecraft state at maneuver epoch
@@ -48,7 +48,7 @@ export function computeDeltaV(frame, angleDeg, magnitude, craftState, refBodyId,
   let dir;
 
   switch (frame) {
-    case 'helio': {
+    case 'inertial': {
       dir = { x: Math.cos(rad), y: Math.sin(rad) };
       break;
     }
@@ -74,7 +74,7 @@ export function computeDeltaV(frame, angleDeg, magnitude, craftState, refBodyId,
 }
 
 // Compute delta-v to circularize orbit around a body at the current distance
-// Returns {dvx, dvy} in heliocentric frame
+// Returns {dvx, dvy} in inertial frame
 export function circularizeDeltaV(craftState, bodyId, epoch) {
   const body = BODY_MAP[bodyId];
   if (!body) return { dvx: 0, dvy: 0 };
@@ -100,7 +100,7 @@ export function circularizeDeltaV(craftState, bodyId, epoch) {
   const radDir = normalize(relPos);
   const tanDir = { x: -radDir.y * sign, y: radDir.x * sign };
 
-  // Target velocity in heliocentric frame
+  // Target velocity in inertial frame
   const targetVx = bodyVel.x + tanDir.x * vCirc;
   const targetVy = bodyVel.y + tanDir.y * vCirc;
 
