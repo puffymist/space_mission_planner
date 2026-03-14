@@ -37,7 +37,7 @@ The time step shrinks automatically when the spacecraft is near a massive body (
 
 ## Coordinate System
 
-The simulation uses a heliocentric coordinate system:
+The simulation uses a heliocentric (inertial) coordinate system:
 
 - **Origin**: The Sun
 - **Epoch**: J2000.0 (January 1, 2000 at 12:00 TT)

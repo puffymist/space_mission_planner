@@ -12,20 +12,20 @@ The simulation treats all burns as **impulsive** — instantaneous velocity chan
 
 The same burn can be described differently depending on your reference frame. The app supports three:
 
-### Heliocentric
-Direction is specified relative to the fixed solar system axes (+X, +Y). This is the most absolute frame — a burn in the +X direction always points the same way regardless of where the spacecraft is.
+### Inertial
+Direction is specified relative to the fixed solar system axes (+X, +Y). This is the absolute frame — a burn in the +X direction always points the same way regardless of where the spacecraft is.
 
 Best for: specifying precise interplanetary trajectory corrections.
 
 ### Velocity-Relative
-Direction is specified relative to the spacecraft's current velocity:
+Direction is specified relative to the spacecraft's current velocity relative to a chosen celestian body:
 
 | Direction | Angle | Effect |
 |-----------|-------|--------|
-| **Prograde** | 0° | Speed up along the direction of travel — raises the opposite side of the orbit |
-| **Normal** | 90° | Perpendicular to velocity — tilts the orbital plane |
-| **Retrograde** | 180° | Slow down — lowers the opposite side of the orbit |
-| **Anti-normal** | 270° | Opposite of normal |
+| **Forward** | 0° | Speed up along the direction of travel — raises the opposite side of the orbit |
+| **Left** | 90° | Perpendicular to velocity — precesses the orbital ellipse |
+| **Backward** | 180° | Slow down — lowers the opposite side of the orbit |
+| **Right** | 270° | Perpendicular to velocity — precesses the orbital plane |
 
 Best for: orbit raising/lowering, escape burns, and capture burns.
 

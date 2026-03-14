@@ -19,7 +19,7 @@ features:
   - title: Hohmann & Bi-Elliptic Transfers
     details: Built-in transfer calculator finds optimal launch windows and computes burns for both classic Hohmann and three-burn bi-elliptic transfers.
   - title: Delta-V Maneuver Planning
-    details: Add, edit, and chain impulsive burns in heliocentric, velocity-relative, or body-relative reference frames with live trajectory preview.
+    details: Add, edit, and chain impulsive burns in inertial, velocity-relative, or body-relative reference frames with live trajectory preview.
   - title: Mission Import & Export
     details: Save your mission plans as JSON files and reload them later. Share missions with others or iterate on complex multi-burn trajectories.
 ---
