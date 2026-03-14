@@ -5,6 +5,7 @@ import useCraftStore from '../state/useCraftStore.js';
 import { BODY_MAP } from '../constants/bodies.js';
 import { toDatetimeLocal, fromDatetimeLocal } from '../utils/time.js';
 import { exportMission, importMission } from '../utils/exportFormat.js';
+import { SHOWCASE_MISSIONS } from '../data/showcaseMissions.js';
 
 const DOCS = '../docs/';
 
@@ -76,6 +77,33 @@ export default function TopBar() {
     a.click();
     URL.revokeObjectURL(url);
   };
+  const loadMission = (data) => {
+    if (data.epoch !== undefined) useSimStore.setState({ epoch: data.epoch });
+    useSimStore.setState({ bookmarks: data.bookmarks || [] });
+    const newCrafts = data.crafts.map((c, i) => ({
+      id: Date.now() + i,
+      name: c.name || `Imported ${i + 1}`,
+      color: c.color || '#44aaff',
+      originBodyId: c.originBodyId || 'earth',
+      launchEpoch: c.launchEpoch,
+      orbitAltitude: c.orbitAltitude || null,
+      launchDirection: c.launchDirection || null,
+      launchPhase: c.launchPhase || 0,
+      launchLinkedGroup: c.launchLinkedGroup || undefined,
+      initialState: c.initialState,
+      events: (c.events || []).map(ev2 => ({
+        epoch: ev2.epoch, dvx: ev2.dvx, dvy: ev2.dvy,
+        ...(ev2.spec ? { spec: ev2.spec } : {}),
+        ...(ev2.linkedGroup ? { linkedGroup: ev2.linkedGroup } : {}),
+      })),
+      segments: [],
+    }));
+    useCraftStore.setState({
+      crafts: newCrafts,
+      selectedCraftId: newCrafts.length > 0 ? newCrafts[0].id : null,
+    });
+    useCraftStore.getState().recomputeAll();
+  };
   const handleImport = () => fileInputRef.current?.click();
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
@@ -83,37 +111,19 @@ export default function TopBar() {
     const reader = new FileReader();
     reader.onload = (ev) => {
       try {
-        const data = importMission(ev.target.result);
-        if (data.epoch !== undefined) useSimStore.setState({ epoch: data.epoch });
-        useSimStore.setState({ bookmarks: data.bookmarks || [] });
-        const newCrafts = data.crafts.map((c, i) => ({
-          id: Date.now() + i,
-          name: c.name || `Imported ${i + 1}`,
-          color: c.color || '#44aaff',
-          originBodyId: c.originBodyId || 'earth',
-          launchEpoch: c.launchEpoch,
-          orbitAltitude: c.orbitAltitude || null,
-          launchDirection: c.launchDirection || null,
-          launchPhase: c.launchPhase || 0,
-          launchLinkedGroup: c.launchLinkedGroup || undefined,
-          initialState: c.initialState,
-          events: (c.events || []).map(ev2 => ({
-            epoch: ev2.epoch, dvx: ev2.dvx, dvy: ev2.dvy,
-            ...(ev2.spec ? { spec: ev2.spec } : {}),
-            ...(ev2.linkedGroup ? { linkedGroup: ev2.linkedGroup } : {}),
-          })),
-          segments: [],
-        }));
-        useCraftStore.setState({
-          crafts: newCrafts,
-          selectedCraftId: newCrafts.length > 0 ? newCrafts[0].id : null,
-        });
-        useCraftStore.getState().recomputeAll();
+        loadMission(importMission(ev.target.result));
       } catch (err) {
         alert('Import failed: ' + err.message);
       }
     };
     reader.readAsText(file);
+    e.target.value = '';
+  };
+  const handleShowcase = (e) => {
+    const idx = Number(e.target.value);
+    if (!isNaN(idx) && SHOWCASE_MISSIONS[idx]) {
+      loadMission(SHOWCASE_MISSIONS[idx].data);
+    }
     e.target.value = '';
   };
 
@@ -185,6 +195,12 @@ export default function TopBar() {
             {frameType === 'rotating' ? 'Rotating' : 'Inertial'}
           </button>
         )}
+        <select value="" onChange={handleShowcase} style={styles.select} title="Load a showcase mission">
+          <option value="" disabled>Showcase missions…</option>
+          {SHOWCASE_MISSIONS.map((m, i) => (
+            <option key={i} value={i}>{m.label}</option>
+          ))}
+        </select>
         <button onClick={handleExport} style={styles.ioBtn} title="Export mission as JSON">Export</button>
         <button onClick={handleImport} style={styles.ioBtn} title="Import mission from JSON">Import</button>
         <input ref={fileInputRef} type="file" accept=".json" onChange={handleFileChange} style={{ display: 'none' }} />
