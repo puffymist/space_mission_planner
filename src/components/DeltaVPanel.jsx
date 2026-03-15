@@ -108,15 +108,18 @@ function ManeuverEditor({ craft, eventIndex, onDone }) {
   const epoch = useSimStore((s) => s.epoch);
 
   // Restore from spec if available, else reverse-engineer
-  const initFrame = ev.spec?.frame || 'helio';
+  const initFrame = ev.spec?.frame || 'inertial';
   const initAngle = ev.spec?.angle ?? (Math.atan2(ev.dvy, ev.dvx) * 180 / Math.PI);
   const initMag = ev.spec?.magnitude ?? Math.sqrt(ev.dvx * ev.dvx + ev.dvy * ev.dvy);
-  const initRefBody = ev.spec?.refBody || 'earth';
+  const initRefBody = ev.spec?.refBody || 'sun';
+  // For circularize: angle encodes sense (0=auto, 1=CCW, -1=CW)
+  const initSense = ev.spec?.frame === 'circularize' ? (ev.spec?.angle || 0) : 0;
 
   const [frame, setFrame] = useState(initFrame);
   const [angle, setAngle] = useState(initAngle);
   const [magnitude, setMagnitude] = useState(initMag);
   const [refBody, setRefBody] = useState(initRefBody);
+  const [circSense, setCircSense] = useState(initSense);
   const [editEpoch, setEditEpoch] = useState(ev.epoch);
   const [dvStep, setDvStep] = useState(100);
   const [linkTarget, setLinkTarget] = useState('launch');
@@ -124,7 +127,7 @@ function ManeuverEditor({ craft, eventIndex, onDone }) {
 
   // Live preview
   useEffect(() => {
-    if (!craft || magnitude === 0) {
+    if (!craft || (frame !== 'circularize' && magnitude === 0)) {
       useUIStore.setState({ maneuverPreview: null });
       return;
     }
@@ -132,7 +135,9 @@ function ManeuverEditor({ craft, eventIndex, onDone }) {
     debounceRef.current = setTimeout(() => {
       const craftState = interpolateState(craft.segments, editEpoch);
       if (!craftState) return;
-      const dv = computeDeltaV(frame, angle, magnitude, craftState, refBody, editEpoch);
+      const effAngle = frame === 'circularize' ? circSense : angle;
+      const effMag = frame === 'circularize' ? 0 : magnitude;
+      const dv = computeDeltaV(frame, effAngle, effMag, craftState, refBody, editEpoch);
       const tempEvents = craft.events.map((e, i) =>
         i === eventIndex ? { epoch: editEpoch, dvx: dv.dvx, dvy: dv.dvy } : e
       );
@@ -148,15 +153,19 @@ function ManeuverEditor({ craft, eventIndex, onDone }) {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       if (previewWorker) { previewWorker.terminate(); previewWorker = null; }
     };
-  }, [frame, angle, magnitude, refBody, editEpoch, craft?.id, eventIndex]);
+  }, [frame, angle, magnitude, refBody, circSense, editEpoch, craft?.id, eventIndex]);
 
   useEffect(() => () => useUIStore.setState({ maneuverPreview: null }), []);
 
   const handleUpdate = () => {
     const craftState = interpolateState(craft.segments, editEpoch);
     if (!craftState) return;
-    const dv = computeDeltaV(frame, angle, magnitude, craftState, refBody, editEpoch);
-    const spec = { frame, angle, magnitude, refBody };
+    const effAngle = frame === 'circularize' ? circSense : angle;
+    const effMag = frame === 'circularize' ? 0 : magnitude;
+    const dv = computeDeltaV(frame, effAngle, effMag, craftState, refBody, editEpoch);
+    const spec = frame === 'circularize'
+      ? { frame, angle: circSense, magnitude: 0, refBody }
+      : { frame, angle, magnitude, refBody };
     updateDeltaV(craft.id, eventIndex, { epoch: editEpoch, dvx: dv.dvx, dvy: dv.dvy, spec });
     useUIStore.setState({ maneuverPreview: null });
     onDone();
@@ -199,7 +208,7 @@ function ManeuverEditor({ craft, eventIndex, onDone }) {
           {FRAMES.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
         </select>
       </div>
-      {frame === 'body' && (
+      {(frame === 'body' || frame === 'velocity' || frame === 'circularize') && (
         <div style={styles.editRow}>
           <span style={styles.editLabel}>Ref:</span>
           <select value={refBody} onChange={(e) => setRefBody(e.target.value)} style={styles.select}>
@@ -207,37 +216,52 @@ function ManeuverEditor({ craft, eventIndex, onDone }) {
           </select>
         </div>
       )}
-      <div style={styles.editRow}>
-        <span style={styles.editLabel}>Angle:</span>
-        <NumericInput value={angle}
-          onChange={(n) => setAngle(n)} style={styles.angleInput} />
-        <span style={styles.unitLabel}>°</span>
-      </div>
-      <div style={styles.presetRow}>
-        {(PRESETS[frame] || []).map(p => (
-          <button key={p.label} onClick={() => setAngle(p.angle)}
-            style={{ ...styles.presetBtn, ...(angle === p.angle ? styles.presetBtnActive : {}) }}>
-            {p.label}
-          </button>
-        ))}
-      </div>
-      <div style={styles.editRow}>
-        <span style={styles.editLabel}>Mag:</span>
-        <NumericInput value={magnitude}
-          onChange={(n) => setMagnitude(Math.max(0, n))} style={styles.magInput} />
-        <span style={styles.unitLabel}>m/s</span>
-      </div>
-      <input type="range" min={0} max={maxMag} step={dvStep}
-        value={Math.min(magnitude, maxMag)}
-        onChange={(e) => setMagnitude(Number(e.target.value))} style={styles.slider} />
-      <div style={styles.presetRow}>
-        {[1, 10, 100, 1000].map(s => (
-          <button key={s} onClick={() => setDvStep(s)}
-            style={{ ...styles.presetBtn, ...(dvStep === s ? styles.presetBtnActive : {}) }}>
-            {s >= 1000 ? `${s / 1000}km/s` : `${s}m/s`}
-          </button>
-        ))}
-      </div>
+      {frame === 'circularize' && (
+        <div style={styles.editRow}>
+          <span style={styles.editLabel}>Sense:</span>
+          <div style={styles.presetRow}>
+            {[{ label: 'Auto', value: 0 }, { label: 'Pro (CCW)', value: 1 }, { label: 'Retro (CW)', value: -1 }].map(s => (
+              <button key={s.value} onClick={() => setCircSense(s.value)}
+                style={{ ...styles.presetBtn, ...(circSense === s.value ? styles.presetBtnActive : {}) }}>
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {frame !== 'circularize' && <>
+        <div style={styles.editRow}>
+          <span style={styles.editLabel}>Angle:</span>
+          <NumericInput value={angle}
+            onChange={(n) => setAngle(n)} style={styles.angleInput} />
+          <span style={styles.unitLabel}>°</span>
+        </div>
+        <div style={styles.presetRow}>
+          {(PRESETS[frame] || []).map(p => (
+            <button key={p.label} onClick={() => setAngle(p.angle)}
+              style={{ ...styles.presetBtn, ...(angle === p.angle ? styles.presetBtnActive : {}) }}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <div style={styles.editRow}>
+          <span style={styles.editLabel}>Mag:</span>
+          <NumericInput value={magnitude}
+            onChange={(n) => setMagnitude(Math.max(0, n))} style={styles.magInput} />
+          <span style={styles.unitLabel}>m/s</span>
+        </div>
+        <input type="range" min={0} max={maxMag} step={dvStep}
+          value={Math.min(magnitude, maxMag)}
+          onChange={(e) => setMagnitude(Number(e.target.value))} style={styles.slider} />
+        <div style={styles.presetRow}>
+          {[1, 10, 100, 1000].map(s => (
+            <button key={s} onClick={() => setDvStep(s)}
+              style={{ ...styles.presetBtn, ...(dvStep === s ? styles.presetBtnActive : {}) }}>
+              {s >= 1000 ? `${s / 1000}km/s` : `${s}m/s`}
+            </button>
+          ))}
+        </div>
+      </>}
       {/* Link controls */}
       <div style={styles.editRow}>
         <span style={styles.editLabel}>Link:</span>
@@ -449,7 +473,8 @@ export default function DeltaVPanel() {
     const craftState = interpolateState(craft.segments, epoch);
     if (!craftState) return;
     const dv = circularizeDeltaV(craftState, refBody, epoch);
-    addDeltaV(craft.id, epoch, dv.dvx, dv.dvy);
+    const spec = { frame: 'circularize', angle: 0, magnitude: 0, refBody };
+    addDeltaV(craft.id, epoch, dv.dvx, dv.dvy, spec);
   };
 
   const groupColors = getGroupColors(craft);
@@ -511,8 +536,17 @@ export default function DeltaVPanel() {
                   <span style={styles.eventDetail}>{formatEpochMedium(ev.epoch)}</span>
                   {ev.spec && (
                     <span style={styles.eventDetail}>
-                      {ev.spec.frame === 'body' ? `${BODY_MAP[ev.spec.refBody]?.name || ev.spec.refBody} ` : ''}
-                      {ev.spec.frame} {ev.spec.angle}°
+                      {ev.spec.frame === 'circularize'
+                        ? `${BODY_MAP[ev.spec.refBody]?.name || ev.spec.refBody} Circ.${ev.spec.angle === 1 ? ' CCW' : ev.spec.angle === -1 ? ' CW' : ''}`
+                        : <>
+                            {ev.spec.frame === 'velocity'
+                              ? `Vel./${BODY_MAP[ev.spec.refBody]?.name || ev.spec.refBody || 'Sun'} `
+                              : ev.spec.frame === 'body'
+                                ? `${BODY_MAP[ev.spec.refBody]?.name || ev.spec.refBody} Body `
+                                : `${FRAMES.find(f => f.id === ev.spec.frame)?.label || ev.spec.frame} `}
+                            {ev.spec.angle}°
+                          </>
+                      }
                     </span>
                   )}
                 </div>
