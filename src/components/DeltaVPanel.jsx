@@ -5,7 +5,7 @@ import useUIStore from '../state/useUIStore.js';
 import { FRAMES, PRESETS, computeDeltaV, circularizeDeltaV } from '../physics/deltaV.js';
 import { interpolateState } from '../utils/interpolate.js';
 import { getBodyPosition, getAllBodyPositions } from '../physics/bodyPosition.js';
-import { nearestBody } from '../physics/gravity.js';
+import { nearestBody, soiBody } from '../physics/gravity.js';
 import { formatEpochMedium, formatVelocity, formatDistance, toDatetimeLocal, fromDatetimeLocal } from '../utils/time.js';
 import BODIES, { BODY_MAP } from '../constants/bodies.js';
 
@@ -447,12 +447,11 @@ export default function DeltaVPanel() {
   if (!craft) return null;
 
   const refBody = (() => {
-    // Auto-detect nearest body for new maneuvers
+    // Auto-detect SOI body for new maneuvers
     const craftState = interpolateState(craft.segments, epoch);
     if (!craftState) return 'earth';
     const bodyPositions = getAllBodyPositions(epoch);
-    const { bodyId } = nearestBody(craftState, bodyPositions);
-    return bodyId;
+    return soiBody(craftState, bodyPositions);
   })();
 
   const handleAddManeuver = () => {
