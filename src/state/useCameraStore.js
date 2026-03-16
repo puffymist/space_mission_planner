@@ -14,13 +14,25 @@ const useCameraStore = create((set) => ({
   trackType: null,
   // Reference frame: 'inertial' (heliocentric) or 'rotating' (co-rotating with tracked body)
   frameType: 'inertial',
+  // Trajectory display frame: 'inertial' | 'comoving' | 'corotating'
+  trajectoryFrame: 'corotating',
 
   setCenter: (x, y) => set({ centerX: x, centerY: y }),
   setZoom: (zoom) => set({ zoom }),
-  setTrackTarget: (bodyId) => set({ trackTarget: bodyId, frameType: 'inertial' }),
-  toggleFrame: () => set((s) => ({
-    frameType: s.frameType === 'inertial' ? 'rotating' : 'inertial',
-  })),
+  setTrackTarget: (bodyId) => set({ trackTarget: bodyId, frameType: 'inertial', trajectoryFrame: 'corotating' }),
+  toggleFrame: () => set((s) => {
+    const newFrame = s.frameType === 'inertial' ? 'rotating' : 'inertial';
+    return {
+      frameType: newFrame,
+      trajectoryFrame: newFrame === 'rotating' ? 'corotating' : 'comoving',
+    };
+  }),
+  setTrajectoryFrame: (mode) => set({ trajectoryFrame: mode }),
+  cycleTrajectoryFrame: () => set((s) => {
+    const order = ['corotating', 'comoving', 'inertial'];
+    const idx = order.indexOf(s.trajectoryFrame);
+    return { trajectoryFrame: order[(idx + 1) % order.length] };
+  }),
 
   // Zoom centered on a screen point (rotation-aware via screenToWorld)
   zoomAt: (factor, screenX, screenY, canvas) => set((state) => {
