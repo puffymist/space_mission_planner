@@ -3,13 +3,14 @@ import { interpolateState } from '../utils/interpolate.js';
 import { formatVelocity } from '../utils/time.js';
 
 // Draw a spacecraft at its current position
-export function drawSpacecraft(ctx, camera, canvas, craft, epoch) {
+export function drawSpacecraft(ctx, camera, canvas, craft, epoch, transform) {
   if (!craft.segments) return;
 
   const state = interpolateState(craft.segments, epoch);
   if (!state) return;
 
-  const screen = worldToScreen(state.x, state.y, camera, canvas);
+  const pos = transform ? transform(state.x, state.y, epoch) : state;
+  const screen = worldToScreen(pos.x, pos.y, camera, canvas);
 
   // Skip if off screen
   if (screen.x < -50 || screen.x > canvas.width + 50 ||
@@ -39,7 +40,8 @@ export function drawSpacecraft(ctx, camera, canvas, craft, epoch) {
   for (const ev of craft.events) {
     const evState = interpolateState(craft.segments, ev.epoch);
     if (!evState) continue;
-    const evScreen = worldToScreen(evState.x, evState.y, camera, canvas);
+    const evPos = transform ? transform(evState.x, evState.y, ev.epoch) : evState;
+    const evScreen = worldToScreen(evPos.x, evPos.y, camera, canvas);
 
     // Small X marker
     const m = 4;
@@ -57,9 +59,17 @@ export function drawSpacecraft(ctx, camera, canvas, craft, epoch) {
     if (dvMag > 0) {
       // Arrow length: log-scaled, clamped
       const arrowLen = Math.min(60, Math.max(15, 10 * Math.log10(dvMag + 1)));
+      // Rotate dv vector if transform is corotating (camera rotatingCtx handles the rest)
+      let dvx = ev.dvx, dvy = ev.dvy;
+      if (transform && transform.rotAngle) {
+        const ra = transform.rotAngle(ev.epoch);
+        const c = Math.cos(ra), s = Math.sin(ra);
+        dvx = ev.dvx * c - ev.dvy * s;
+        dvy = ev.dvx * s + ev.dvy * c;
+      }
       // Direction in screen coords (Y flipped)
-      const dirX = ev.dvx / dvMag;
-      const dirY = -ev.dvy / dvMag;
+      const dirX = dvx / dvMag;
+      const dirY = -dvy / dvMag;
       const endX = evScreen.x + dirX * arrowLen;
       const endY = evScreen.y + dirY * arrowLen;
 

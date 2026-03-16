@@ -48,6 +48,8 @@ export default function TopBar() {
   const trackTarget = useCameraStore((s) => s.trackTarget);
   const trackType = useCameraStore((s) => s.trackType);
   const toggleFrame = useCameraStore((s) => s.toggleFrame);
+  const trajectoryFrame = useCameraStore((s) => s.trajectoryFrame);
+  const cycleTrajectoryFrame = useCameraStore((s) => s.cycleTrajectoryFrame);
 
   // Epoch slider state
   const [isDragging, setIsDragging] = useState(false);
@@ -193,6 +195,19 @@ export default function TopBar() {
             title="Toggle rotating reference frame (R)"
           >
             {frameType === 'rotating' ? 'Rotating' : 'Inertial'}
+          </button>
+        )}
+        {canRotate && (
+          <button
+            onClick={cycleTrajectoryFrame}
+            style={trajectoryFrame !== 'inertial' ? styles.frameActive : styles.frameBtn}
+            title="Cycle trajectory display frame (T)"
+          >
+            Path: {trajectoryFrame === 'corotating'
+              ? 'Corotating'
+              : trajectoryFrame === 'comoving'
+                ? `${BODY_MAP[trackTarget]?.name}-centered`
+                : 'Inertial'}
           </button>
         )}
         <select value="" onChange={handleShowcase} style={styles.select} title="Load a showcase mission">
