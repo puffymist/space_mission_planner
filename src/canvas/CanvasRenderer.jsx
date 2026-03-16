@@ -15,6 +15,7 @@ import { drawTransferPreview } from './drawTransferPreview.js';
 import { setupInteraction } from './interaction.js';
 import { interpolateState } from '../utils/interpolate.js';
 import { worldToScreen } from './camera.js';
+import { createTrajectoryTransform } from './trajectoryTransform.js';
 
 // Keyboard shortcut: digit -> body to track
 const DIGIT_BODIES = {
@@ -142,6 +143,12 @@ export default function CanvasRenderer() {
             useCameraStore.getState().toggleFrame();
           }
           break;
+        case 't':
+        case 'T':
+          if (cam.trackTarget && cam.trackType === 'body' && cam.trackTarget !== 'sun' && BODY_MAP[cam.trackTarget]?.parent) {
+            useCameraStore.getState().cycleTrajectoryFrame();
+          }
+          break;
         default: {
           // Digit keys: jump to body
           const bodyId = DIGIT_BODIES[e.key];
@@ -231,6 +238,11 @@ export default function CanvasRenderer() {
 
       const epochStep = useSimStore.getState().epochStep;
 
+      // Build trajectory transform for comoving/corotating display
+      const trajTransform = (cam.trackTarget && cam.trackType === 'body')
+        ? createTrajectoryTransform(cam.trackTarget, epoch, cam.trajectoryFrame)
+        : null;
+
       // Draw layers (back to front)
       drawOrbits(ctx, cam, logicalCanvas, bodyPositions, epochStep);
 
@@ -238,7 +250,7 @@ export default function CanvasRenderer() {
       const ui = useUIStore.getState();
       const crafts = useCraftStore.getState().crafts;
       if (ui.hoveredEpoch !== null) {
-        drawGhosts(ctx, cam, logicalCanvas, ui.hoveredEpoch, crafts);
+        drawGhosts(ctx, cam, logicalCanvas, ui.hoveredEpoch, crafts, trajTransform);
       }
 
       // Transfer preview ellipse
@@ -258,7 +270,8 @@ export default function CanvasRenderer() {
           ctx.beginPath();
           let started = false;
           for (const pt of seg) {
-            const scr = worldToScreen(pt.x, pt.y, cam, logicalCanvas);
+            const pos = trajTransform ? trajTransform(pt.x, pt.y, pt.t) : pt;
+            const scr = worldToScreen(pos.x, pos.y, cam, logicalCanvas);
             if (scr.x < -500 || scr.x > logicalCanvas.width + 500 ||
                 scr.y < -500 || scr.y > logicalCanvas.height + 500) {
               if (started) { ctx.stroke(); ctx.beginPath(); started = false; }
@@ -274,13 +287,13 @@ export default function CanvasRenderer() {
 
       // Trajectories
       for (const craft of crafts) {
-        drawTrajectory(ctx, cam, logicalCanvas, craft.segments, craft.color, epoch, epochStep, craft);
+        drawTrajectory(ctx, cam, logicalCanvas, craft.segments, craft.color, epoch, epochStep, craft, trajTransform);
       }
 
       drawBodies(ctx, cam, logicalCanvas, bodyPositions);
 
       for (const craft of crafts) {
-        drawSpacecraft(ctx, cam, logicalCanvas, craft, epoch);
+        drawSpacecraft(ctx, cam, logicalCanvas, craft, epoch, trajTransform);
       }
 
       // Drag preview: draw ghost diamond at drag position
@@ -319,7 +332,8 @@ export default function CanvasRenderer() {
           const lastSeg = craft.segments[craft.segments.length - 1];
           if (!lastSeg || lastSeg.length === 0) continue;
           const lastPt = lastSeg[lastSeg.length - 1];
-          const scr = worldToScreen(lastPt.x, lastPt.y, cam, logicalCanvas);
+          const lastPos = trajTransform ? trajTransform(lastPt.x, lastPt.y, lastPt.t) : lastPt;
+          const scr = worldToScreen(lastPos.x, lastPos.y, cam, logicalCanvas);
           ctx.beginPath();
           ctx.arc(scr.x, scr.y, 4, 0, Math.PI * 2);
           ctx.fillStyle = craft.color;

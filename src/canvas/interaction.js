@@ -1,13 +1,14 @@
 import { screenToWorld, worldToScreen } from './camera.js';
 import { dist } from '../utils/vector.js';
-import { getAllBodyPositions, getBodyVelocity } from '../physics/bodyPosition.js';
+import { getAllBodyPositions, getBodyPosition, getBodyVelocity } from '../physics/bodyPosition.js';
 import { nearestBody } from '../physics/gravity.js';
 import { interpolateState } from '../utils/interpolate.js';
-import BODIES from '../constants/bodies.js';
+import BODIES, { BODY_MAP } from '../constants/bodies.js';
 import useUIStore from '../state/useUIStore.js';
 import useCameraStore from '../state/useCameraStore.js';
 import useSimStore from '../state/useSimStore.js';
 import useCraftStore from '../state/useCraftStore.js';
+import { createTrajectoryTransform } from './trajectoryTransform.js';
 
 export function setupInteraction(canvas) {
   let dragging = false;
@@ -91,10 +92,21 @@ export function setupInteraction(canvas) {
     }
 
     // Hover detection in world coordinates (fast)
-    const cam = useCameraStore.getState();
+    let cam = useCameraStore.getState();
     const lc = logicalCanvas();
-    const worldPos = screenToWorld(e.offsetX, e.offsetY, cam, lc);
     const epoch = useSimStore.getState().epoch;
+
+    // Build rotatingCtx so screenToWorld returns inertial coordinates
+    if (cam.frameType === 'rotating' && cam.trackTarget && cam.trackType === 'body') {
+      const body = BODY_MAP[cam.trackTarget];
+      if (body && body.parent) {
+        const parentPos = getBodyPosition(body.parent, epoch);
+        const angle = body.initialAngle + body.angularVelocity * epoch;
+        cam = { ...cam, rotatingCtx: { pivotX: parentPos.x, pivotY: parentPos.y, angle } };
+      }
+    }
+
+    const worldPos = screenToWorld(e.offsetX, e.offsetY, cam, lc);
 
     // Threshold in world coords: 15 pixels worth of world distance
     const threshold = 15 / cam.zoom;
@@ -106,14 +118,19 @@ export function setupInteraction(canvas) {
 
     // 1. Check spacecraft trajectories in world space
     const crafts = useCraftStore.getState().crafts;
+    // Build trajectory transform for hover detection (matches display)
+    const trajTransform = (cam.trackTarget && cam.trackType === 'body')
+      ? createTrajectoryTransform(cam.trackTarget, epoch, cam.trajectoryFrame)
+      : null;
     for (const craft of crafts) {
       if (!craft.segments) continue;
       for (const seg of craft.segments) {
         const step = Math.max(1, Math.floor(seg.length / 500));
         for (let i = 0; i < seg.length; i += step) {
           const pt = seg[i];
-          const dx = pt.x - worldPos.x;
-          const dy = pt.y - worldPos.y;
+          const pos = trajTransform ? trajTransform(pt.x, pt.y, pt.t) : pt;
+          const dx = pos.x - worldPos.x;
+          const dy = pos.y - worldPos.y;
           const d = Math.sqrt(dx * dx + dy * dy);
           if (d < bestDist) {
             bestDist = d;
@@ -129,8 +146,9 @@ export function setupInteraction(canvas) {
             const hi = Math.min(seg.length - 1, bestIdx + step);
             for (let i = lo; i <= hi; i++) {
               const pt = seg[i];
-              const dx = pt.x - worldPos.x;
-              const dy = pt.y - worldPos.y;
+              const pos = trajTransform ? trajTransform(pt.x, pt.y, pt.t) : pt;
+              const dx = pos.x - worldPos.x;
+              const dy = pos.y - worldPos.y;
               const d = Math.sqrt(dx * dx + dy * dy);
               if (d < bestDist) {
                 bestDist = d;

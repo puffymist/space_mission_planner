@@ -5,7 +5,7 @@ import { getAllBodyPositions } from '../physics/bodyPosition.js';
 import { interpolateState } from '../utils/interpolate.js';
 
 // Draw semi-transparent ghost positions of all bodies and spacecraft at a given epoch
-export function drawGhosts(ctx, camera, canvas, ghostEpoch, crafts) {
+export function drawGhosts(ctx, camera, canvas, ghostEpoch, crafts, transform) {
   if (ghostEpoch === null) return;
 
   const positions = getAllBodyPositions(ghostEpoch);
@@ -16,8 +16,9 @@ export function drawGhosts(ctx, camera, canvas, ghostEpoch, crafts) {
 
   // Draw ghost bodies
   for (const body of BODIES) {
-    const pos = positions[body.id];
-    if (!pos) continue;
+    const rawPos = positions[body.id];
+    if (!rawPos) continue;
+    const pos = transform ? transform(rawPos.x, rawPos.y, ghostEpoch) : rawPos;
 
     const screen = worldToScreen(pos.x, pos.y, camera, canvas);
     if (screen.x < -50 || screen.x > canvas.width + 50) continue;
@@ -80,7 +81,8 @@ export function drawGhosts(ctx, camera, canvas, ghostEpoch, crafts) {
     if (!state) continue;
     if (clamped) ctx.globalAlpha = 0.2; // dimmer when at trajectory boundary
 
-    const screen = worldToScreen(state.x, state.y, camera, canvas);
+    const pos = transform ? transform(state.x, state.y, clampedEpoch) : state;
+    const screen = worldToScreen(pos.x, pos.y, camera, canvas);
     if (screen.x < -50 || screen.x > canvas.width + 50) continue;
     if (screen.y < -50 || screen.y > canvas.height + 50) continue;
 

@@ -1,13 +1,14 @@
 import { worldToScreen } from './camera.js';
 
 // Draw segment lines between startIdx and endIdx
-function drawSegmentRange(ctx, camera, canvas, seg, startIdx, endIdx) {
+function drawSegmentRange(ctx, camera, canvas, seg, startIdx, endIdx, transform) {
   ctx.beginPath();
   let started = false;
 
   for (let i = startIdx; i < endIdx; i++) {
     const pt = seg[i];
-    const screen = worldToScreen(pt.x, pt.y, camera, canvas);
+    const pos = transform ? transform(pt.x, pt.y, pt.t) : pt;
+    const screen = worldToScreen(pos.x, pos.y, camera, canvas);
 
     if (screen.x < -500 || screen.x > canvas.width + 500 ||
         screen.y < -500 || screen.y > canvas.height + 500) {
@@ -31,7 +32,7 @@ function drawSegmentRange(ctx, camera, canvas, seg, startIdx, endIdx) {
 }
 
 // Draw all trajectory segments for a spacecraft
-export function drawTrajectory(ctx, camera, canvas, segments, color, currentEpoch, epochStep, craft) {
+export function drawTrajectory(ctx, camera, canvas, segments, color, currentEpoch, epochStep, craft, transform) {
   if (!segments || segments.length === 0) return;
 
   ctx.strokeStyle = color;
@@ -51,7 +52,7 @@ export function drawTrajectory(ctx, camera, canvas, segments, color, currentEpoc
     if (!hasClosedOrbit || si < coastStart) {
       // Pre-coast or no closure: draw at full alpha
       ctx.globalAlpha = 0.8;
-      drawSegmentRange(ctx, camera, canvas, seg, 0, seg.length);
+      drawSegmentRange(ctx, camera, canvas, seg, 0, seg.length, transform);
     } else {
       // Coasting segment — split at first orbit boundary
       const segStart = coastCumPts;
@@ -61,17 +62,17 @@ export function drawTrajectory(ctx, camera, canvas, segments, color, currentEpoc
         // Boundary falls within this segment
         const localBoundary = firstOrbitPts - segStart;
         ctx.globalAlpha = 0.8;
-        drawSegmentRange(ctx, camera, canvas, seg, 0, localBoundary);
+        drawSegmentRange(ctx, camera, canvas, seg, 0, localBoundary, transform);
         ctx.globalAlpha = 0.15;
-        drawSegmentRange(ctx, camera, canvas, seg, localBoundary, seg.length);
+        drawSegmentRange(ctx, camera, canvas, seg, localBoundary, seg.length, transform);
       } else if (segEnd <= firstOrbitPts) {
         // Entire segment is in the first orbit
         ctx.globalAlpha = 0.8;
-        drawSegmentRange(ctx, camera, canvas, seg, 0, seg.length);
+        drawSegmentRange(ctx, camera, canvas, seg, 0, seg.length, transform);
       } else {
         // Entire segment is in the second orbit
         ctx.globalAlpha = 0.15;
-        drawSegmentRange(ctx, camera, canvas, seg, 0, seg.length);
+        drawSegmentRange(ctx, camera, canvas, seg, 0, seg.length, transform);
       }
 
       coastCumPts = segEnd;
@@ -115,9 +116,13 @@ export function drawTrajectory(ctx, camera, canvas, segments, color, currentEpoc
         const p0 = seg[idx];
         const p1 = seg[idx + 1];
         const frac = (t - p0.t) / (p1.t - p0.t);
-        const x = p0.x + frac * (p1.x - p0.x);
-        const y = p0.y + frac * (p1.y - p0.y);
+        let x = p0.x + frac * (p1.x - p0.x);
+        let y = p0.y + frac * (p1.y - p0.y);
 
+        if (transform) {
+          const tp = transform(x, y, t);
+          x = tp.x; y = tp.y;
+        }
         const scr = worldToScreen(x, y, camera, canvas);
         const dsx = scr.x - lastScreenX;
         const dsy = scr.y - lastScreenY;
