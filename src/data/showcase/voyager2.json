@@ -1,0 +1,66 @@
+{
+  "label": "Voyager 2",
+  "version": 3,
+  "epoch": -705792600,
+  "bookmarks": [
+    { "epoch": -646443540 },
+    { "epoch": -579436383 },
+    { "epoch": -439758600 },
+    { "epoch": -326707404 }
+  ],
+  "crafts": [
+    {
+      "name": "Voyager 2",
+      "color": "#DA9100",
+      "originBodyId": "earth",
+      "launchEpoch": -705792600,
+      "orbitAltitude": 18142895.523805074,
+      "launchDirection": "prograde",
+      "launchPhase": 0,
+      "launchLinkedGroup": "link-1",
+      "initialState": {
+        "x": 128400608094.72307,
+        "y": -76804117887.06853,
+        "vx": 17695.835842352604,
+        "vy": 29583.779430204646
+      },
+      "events": [
+        {
+          "epoch": -705792600,
+          "dvx": 3388.7932483693644,
+          "dvy": 5665.361777056227,
+          "spec": {
+            "frame": "velocity",
+            "angle": 0,
+            "magnitude": 6601.533438915801,
+            "refBody": "earth"
+          },
+          "linkedGroup": "link-1"
+        },
+        {
+          "epoch": -705792600,
+          "dvx": 835.0176606817329,
+          "dvy": -499.4742299154243,
+          "spec": {
+            "frame": "velocity",
+            "angle": 270,
+            "magnitude": 973,
+            "refBody": "earth"
+          },
+          "linkedGroup": "link-1"
+        },
+        {
+          "epoch": -323395200,
+          "dvx": 0,
+          "dvy": 0,
+          "spec": {
+            "frame": "velocity",
+            "angle": 0,
+            "magnitude": 0,
+            "refBody": "sun"
+          }
+        }
+      ]
+    }
+  ]
+}
