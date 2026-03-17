@@ -42,7 +42,7 @@ export function drawOrbits(ctx, camera, canvas, bodyPositions, epochStep) {
     if (epochStep && body.angularVelocity !== 0) {
       const angularInterval = body.angularVelocity * epochStep;
       const markerCount = Math.abs(2 * Math.PI / angularInterval);
-      if (markerCount > 4 && markerCount < 200) {
+      if (markerCount > 2 && markerCount < 200) {
         ctx.strokeStyle = vis.color;
         ctx.lineWidth = 0.5;
         ctx.globalAlpha = 0.5;
