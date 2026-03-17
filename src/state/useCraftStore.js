@@ -10,6 +10,10 @@ import { integrateSegment } from '../physics/integrator.js';
 let nextId = 1;
 let nextLinkGroup = 1;
 
+export function freshLinkGroupId() {
+  return `link-${nextLinkGroup++}`;
+}
+
 const CRAFT_COLORS = ['#00ff88', '#ff6644', '#44aaff', '#ffaa00', '#ff44ff', '#44ffff'];
 const G = 6.6743e-11;
 
@@ -384,7 +388,7 @@ const useCraftStore = create((set, get) => ({
 
   // Epoch-linking: link events (and optionally launch) into a group
   linkEvents: (craftId, eventIndices, includeLaunch = false) => set((state) => {
-    const groupId = `link-${nextLinkGroup++}`;
+    const groupId = freshLinkGroupId();
     const crafts = state.crafts.map((c) => {
       if (c.id !== craftId) return c;
       const events = c.events.map((ev, i) =>

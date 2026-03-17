@@ -1,0 +1,59 @@
+{
+  "label": "Earth-Moon ellipse",
+  "version": 3,
+  "epoch": 11496936.959999843,
+  "bookmarks": [],
+  "crafts": [
+    {
+      "name": "Earth-Moon ellipse",
+      "color": "#888888",
+      "originBodyId": "earth",
+      "launchEpoch": 0,
+      "orbitAltitude": 18142895.523805074,
+      "launchDirection": "prograde",
+      "launchPhase": 0,
+      "launchLinkedGroup": null,
+      "initialState": {
+        "x": -27163030166.96541,
+        "y": 147131772488.65692,
+        "vx": -33899.48045470638,
+        "vy": -6258.421241453021
+      },
+      "events": [
+        {
+          "epoch": 0,
+          "dvx": -1750.4197683611574,
+          "dvy": -323.15729069676246,
+          "spec": {
+            "frame": "velocity",
+            "angle": 0,
+            "magnitude": 1780,
+            "refBody": "earth"
+          }
+        },
+        {
+          "epoch": 352800,
+          "dvx": 342.36615689731843,
+          "dvy": 329.89934669157265,
+          "spec": {
+            "frame": "circularize",
+            "angle": 0,
+            "magnitude": 0,
+            "refBody": "moon"
+          }
+        },
+        {
+          "epoch": 2678400,
+          "dvx": -523.8224318509804,
+          "dvy": 851.8274824691472,
+          "spec": {
+            "frame": "velocity",
+            "angle": 0,
+            "magnitude": 1000,
+            "refBody": "moon"
+          }
+        }
+      ]
+    }
+  ]
+}

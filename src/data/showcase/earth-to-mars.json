@@ -1,0 +1,48 @@
+{
+  "name": "Earth to Mars",
+  "version": 2,
+  "epoch": 61300800,
+  "crafts": [
+    {
+      "name": "Earth to Mars",
+      "color": "#F1743E",
+      "originBodyId": "earth",
+      "launchEpoch": 37494000,
+      "orbitAltitude": 18142895.523805074,
+      "launchDirection": "prograde",
+      "launchPhase": 0,
+      "launchLinkedGroup": "link-1",
+      "initialState": {
+        "x": -146442268069.94037,
+        "y": 30663509356.189312,
+        "vx": -7064.939261660726,
+        "vy": -33740.61713667276
+      },
+      "events": [
+        {
+          "epoch": 37494000,
+          "dvx": -1159.095556895969,
+          "dvy": -2563.9750252262643,
+          "spec": {
+            "frame": "body",
+            "angle": -12.5,
+            "magnitude": 2813.8,
+            "refBody": "earth"
+          },
+          "linkedGroup": "link-1"
+        },
+        {
+          "epoch": 61300800,
+          "dvx": -944.5996382841596,
+          "dvy": 1694.5003757312759,
+          "spec": {
+            "frame": "velocity",
+            "angle": 20,
+            "magnitude": 1940,
+            "refBody": "earth"
+          }
+        }
+      ]
+    }
+  ]
+}

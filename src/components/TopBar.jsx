@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import useSimStore from '../state/useSimStore.js';
 import useCameraStore from '../state/useCameraStore.js';
-import useCraftStore from '../state/useCraftStore.js';
+import useCraftStore, { freshLinkGroupId } from '../state/useCraftStore.js';
 import { BODY_MAP } from '../constants/bodies.js';
 import { toDatetimeLocal, fromDatetimeLocal } from '../utils/time.js';
 import { exportMission, importMission } from '../utils/exportFormat.js';
@@ -79,7 +79,23 @@ export default function TopBar() {
   };
   const loadMission = (data) => {
     if (data.epoch !== undefined) useSimStore.setState({ epoch: data.epoch });
-    useSimStore.setState({ bookmarks: data.bookmarks || [] });
+
+    // Merge bookmarks (dedup by epoch)
+    const existingBookmarks = useSimStore.getState().bookmarks;
+    const existingEpochs = new Set(existingBookmarks.map(b => b.epoch));
+    const newBookmarks = (data.bookmarks || []).filter(b => !existingEpochs.has(b.epoch));
+    useSimStore.setState({
+      bookmarks: [...existingBookmarks, ...newBookmarks].sort((a, b) => a.epoch - b.epoch),
+    });
+
+    // Remap linked group IDs to avoid collisions with existing crafts
+    const linkGroupMap = new Map();
+    const remapGroup = (id) => {
+      if (!id) return undefined;
+      if (!linkGroupMap.has(id)) linkGroupMap.set(id, freshLinkGroupId());
+      return linkGroupMap.get(id);
+    };
+
     const newCrafts = data.crafts.map((c, i) => ({
       id: Date.now() + i,
       name: c.name || `Imported ${i + 1}`,
@@ -89,17 +105,20 @@ export default function TopBar() {
       orbitAltitude: c.orbitAltitude || null,
       launchDirection: c.launchDirection || null,
       launchPhase: c.launchPhase || 0,
-      launchLinkedGroup: c.launchLinkedGroup || undefined,
+      launchLinkedGroup: remapGroup(c.launchLinkedGroup),
       initialState: c.initialState,
       events: (c.events || []).map(ev2 => ({
         epoch: ev2.epoch, dvx: ev2.dvx, dvy: ev2.dvy,
         ...(ev2.spec ? { spec: ev2.spec } : {}),
-        ...(ev2.linkedGroup ? { linkedGroup: ev2.linkedGroup } : {}),
+        ...(ev2.linkedGroup ? { linkedGroup: remapGroup(ev2.linkedGroup) } : {}),
       })),
       segments: [],
     }));
+
+    // Append to existing crafts
+    const existingCrafts = useCraftStore.getState().crafts;
     useCraftStore.setState({
-      crafts: newCrafts,
+      crafts: [...existingCrafts, ...newCrafts],
       selectedCraftId: newCrafts.length > 0 ? newCrafts[0].id : null,
     });
     useCraftStore.getState().recomputeAll();
